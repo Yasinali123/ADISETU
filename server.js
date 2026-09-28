@@ -214,33 +214,45 @@ app.post('/api/crop-analyze', async (req, res) => {
       chosenModel = 'gpt-4o-mini';
     }
 
-    const visionRes = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${effectiveKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: chosenModel,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'You are an expert agricultural plant pathologist and entomologist analyzing a crop photo. Carefully inspect the leaf, stem, or fruit for pests, insects, larvae, caterpillars, borers, aphids, whiteflies, fungal spots, blight, yellowing, or disease symptoms. If pests or diseases are present, accurately identify them (e.g. Fall Armyworm, Paddy Stem Borer, Aphids, Early Blight, Sheath Blight, Powdery Mildew). Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string: "High Risk" | "Moderate Risk" | "Low Risk"), severityLevel (number 1-3), symptoms (object with hi, sat, en strings describing the specific pests or damage found), actions (object with hi, sat, en arrays of 3 specific pesticide/treatment step strings), weatherAlert (object with hi, sat, en strings).'
-              },
-              {
-                type: 'image_url',
-                image_url: { url: imageSrc }
-              }
-            ]
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 600
-      })
-    });
+    let attempts = 0;
+    let visionRes;
+    while (attempts < 2) {
+      attempts++;
+      visionRes = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${effectiveKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: chosenModel,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Analyze this crop photo for pests, insects, or leaf diseases. Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string), severityLevel (number 1-3), symptoms (object with hi, sat, en strings), actions (object with hi, sat, en arrays of 3 action step strings), weatherAlert (object with hi, sat, en strings).'
+                },
+                {
+                  type: 'image_url',
+                  image_url: { url: imageSrc }
+                }
+              ]
+            }
+          ],
+          temperature: 0.1,
+          max_tokens: 250
+        })
+      });
+
+      if (visionRes.status === 429 && attempts < 2) {
+        console.warn('[Crop Vision Server] HTTP 429 Rate Limit, waiting 2.5s before retry...');
+        await new Promise(r => setTimeout(r, 2500));
+        continue;
+      }
+      break;
+    }
 
     if (visionRes.ok) {
       const data = await visionRes.json();
@@ -251,7 +263,10 @@ app.post('/api/crop-analyze', async (req, res) => {
     } else {
       const errData = await visionRes.json().catch(() => ({}));
       console.warn('[Crop Vision Server] Provider returned HTTP', visionRes.status, errData);
-      return res.status(visionRes.status).json({ success: false, error: errData.error?.message || 'Vision API error' });
+      const errMsg = visionRes.status === 429
+        ? 'AI rate limit reached. Retrying shortly, please tap Retry Analysis in a few seconds.'
+        : errData.error?.message || 'Vision API error';
+      return res.status(visionRes.status).json({ success: false, error: errMsg });
     }
   } catch (err) {
     console.error('[Crop Vision Server] Vision API exception:', err);

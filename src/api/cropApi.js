@@ -158,33 +158,45 @@ export const analyzeCropImage = async (imageSrc, customApiKey = '') => {
   const effectiveKey = apiKey || localStorage.getItem('vision_api_key') || localStorage.getItem('groq_api_key') || SYSTEM_GROQ_KEY;
 
   try {
-    const visionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${effectiveKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'qwen/qwen3.8-27b',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'You are an expert agricultural plant pathologist and entomologist. Analyze this crop photo for pests, insects, caterpillars, borers, aphids, whiteflies, or leaf diseases. Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string), severityLevel (number 1-3), symptoms (object with hi, sat, en strings), actions (object with hi, sat, en arrays of 3 action step strings), weatherAlert (object with hi, sat, en strings).'
-              },
-              {
-                type: 'image_url',
-                image_url: { url: imageSrc }
-              }
-            ]
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 600
-      })
-    });
+    let attempts = 0;
+    let visionRes;
+    while (attempts < 2) {
+      attempts++;
+      visionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${effectiveKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'qwen/qwen3.8-27b',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Analyze this crop photo for pests, insects, or leaf diseases. Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string), severityLevel (number 1-3), symptoms (object with hi, sat, en strings), actions (object with hi, sat, en arrays of 3 action step strings), weatherAlert (object with hi, sat, en strings).'
+                },
+                {
+                  type: 'image_url',
+                  image_url: { url: imageSrc }
+                }
+              ]
+            }
+          ],
+          temperature: 0.1,
+          max_tokens: 250
+        })
+      });
+
+      if (visionRes.status === 429 && attempts < 2) {
+        console.warn('[Direct Vision API] HTTP 429 Rate Limit, retrying in 2.5s...');
+        await new Promise(r => setTimeout(r, 2500));
+        continue;
+      }
+      break;
+    }
 
     const data = await visionRes.json();
     if (visionRes.ok) {
@@ -197,7 +209,10 @@ export const analyzeCropImage = async (imageSrc, customApiKey = '') => {
     }
     
     if (data.error && data.error.message) {
-      throw new Error(`Groq Vision Error: ${data.error.message}`);
+      if (visionRes.status === 429) {
+        throw new Error('Groq AI token limit reached for this minute. Please wait 10 seconds and tap Retry Analysis.');
+      }
+      throw new Error(`Groq AI Error: ${data.error.message}`);
     }
   } catch (err) {
     throw err;
