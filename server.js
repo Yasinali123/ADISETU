@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -363,18 +364,26 @@ wss.on('connection', (clientWs, req) => {
 });
 
 // Serve frontend build from dist folder for production deployment (Render)
-app.use(express.static(path.join(__dirname, 'dist')));
+const distPath = path.join(__dirname, 'dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+}
 
 // Fallback all non-API GET requests to index.html for React SPA client routing
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/ws')) {
     return next();
   }
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  const indexPath = path.join(__dirname, 'dist', 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  return res.status(200).send('ADISETU Agricultural AI Web Service is running.');
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`[xAI Voice Server] Listening on http://localhost:${PORT}`);
-  console.log(`[xAI Voice Server] WebSocket proxy endpoint: ws://localhost:${PORT}/ws-xai`);
+const HOST = '0.0.0.0';
+server.listen(PORT, HOST, () => {
+  console.log(`[ADISETU Server] Listening on http://${HOST}:${PORT}`);
+  console.log(`[ADISETU Server] WebSocket proxy endpoint: ws://${HOST}:${PORT}/ws-xai`);
 });

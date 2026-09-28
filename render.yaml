@@ -4,15 +4,21 @@ services:
     env: node
     plan: free
     region: singapore # or oregon, frankfurt, etc.
-    buildCommand: npm install && npm run build
+    buildCommand: npm run render-build
     startCommand: npm start
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: qwen/qwen3.8-27b
+      - key: GROQ_VISION_MODEL
+        value: qwen/qwen3.8-27b
+      - key: SARVAM_API_KEY
+        sync: false
       - key: XAI_API_KEY
         sync: false
       - key: XAI_AGENT_ID
         value: agent_hqm1pHqkbVkCk2dJ
-      - key: SARVAM_API_KEY
-        sync: false
