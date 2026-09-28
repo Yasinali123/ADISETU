@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://adisetu.onrender.com/api/:path*"
+    },
+    {
+      "source": "/ws-xai",
+      "destination": "https://adisetu.onrender.com/ws-xai"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

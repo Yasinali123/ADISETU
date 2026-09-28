@@ -139,24 +139,24 @@ export const analyzeCropImage = async (imageSrc, customApiKey = '') => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ imageSrc, apiKey, model: 'llama-3.2-11b-vision-preview' })
     });
-    const data = await res.json();
-    if (res.ok && data.success && data.analysis) {
-      return data.analysis;
-    }
-    if (data && data.error) {
-      throw new Error(data.error);
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await res.json();
+      if (res.ok && data.success && data.analysis) {
+        return data.analysis;
+      }
+      if (data && data.error && res.status !== 404) {
+        console.warn('[Crop Vision API] Server returned error:', data.error);
+      }
     }
   } catch (err) {
-    console.warn('[Crop Vision API] Server endpoint error:', err);
-    if (err.message && !err.message.includes('fetch')) {
-      throw err;
-    }
+    console.warn('[Crop Vision API] Server endpoint fetch error:', err);
   }
 
   // 2. Direct Groq Vision API Call (llama-3.2-11b-vision-preview)
-  const effectiveKey = apiKey || import.meta.env.VITE_GROQ_API_KEY || '';
+  const effectiveKey = apiKey || import.meta.env.VITE_GROQ_API_KEY || localStorage.getItem('vision_api_key') || '';
   if (!effectiveKey) {
-    throw new Error('No Groq Vision API Key configured. Please add your Groq API Key in settings to analyze images.');
+    throw new Error('No Groq Vision API Key configured. Please tap the Settings ⚙️ icon above to enter your Groq API Key.');
   }
 
   try {

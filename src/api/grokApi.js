@@ -26,12 +26,15 @@ export const askGrokAI = async (question, language = 'hi', customApiKey = '') =>
       })
     });
 
-    const data = await response.json();
-    if (response.ok && data.answer) {
-      return data.answer;
-    }
-    if (data && data.error) {
-      return `[AI Notice]: ${data.error}`;
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      if (response.ok && data.answer) {
+        return data.answer;
+      }
+      if (data && data.error && response.status !== 404) {
+        return `[AI Notice]: ${data.error}`;
+      }
     }
   } catch (err) {
     console.warn('[Groq AI] Backend API call failed, attempting direct Groq API:', err);
