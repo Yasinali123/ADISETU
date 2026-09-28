@@ -29,48 +29,51 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-app.post('/api/grok-chat', async (req, res) => {
-  const { question, language, apiKey } = req.body;
-  const key = apiKey || process.env.XAI_API_KEY || '';
-
+app.post(['/api/grok-chat', '/api/groq-chat'], async (req, res) => {
+  const { question, language, apiKey, model } = req.body;
+  const groqKey = apiKey || process.env.GROQ_API_KEY || '';
+  const groqModel = model || process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
 
   const systemPrompt = language === 'hi' 
-    ? 'आप ADISETU Grok AI हैं, जो झारखंड के किसानों के कृषि सलाहकार हैं। सरल, व्यावहारिक और सटीक कृषि सलाह 2-3 वाक्यों में दें ताकि इसे आसानी से पढ़कर सुनाया जा सके।'
-    : 'You are ADISETU Grok AI, an expert agricultural AI advisor for farmers in Jharkhand, India. Provide clear, practical, concise farming advice (2-3 sentences max) suitable for text-to-speech voice playback.';
+    ? 'आप ADISETU AI हैं, जो झारखंड के किसानों के कृषि सलाहकार हैं। किसान के कृषि प्रश्न का गहरा विश्लेषण करें और सरल, व्यावहारिक, सटीक सलाह 2-3 वाक्यों में दें ताकि इसे आसानी से पढ़कर सुनाया जा सके।'
+    : 'You are ADISETU AI, an expert agricultural AI advisor for farmers in Jharkhand, India. Deeply analyze the farmer question and provide clear, practical, concise farming advice (2-3 sentences max) suitable for text-to-speech voice playback.';
 
   try {
-    const xaiRes = await fetch('https://api.x.ai/v1/chat/completions', {
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${key}`
+        'Authorization': `Bearer ${groqKey}`
       },
       body: JSON.stringify({
-        model: 'grok-2-latest',
+        model: groqModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: question }
         ],
         temperature: 0.6,
-        max_tokens: 300
+        max_tokens: 350
       })
     });
 
-    if (xaiRes.ok) {
-      const data = await xaiRes.json();
+    if (groqRes.ok) {
+      const data = await groqRes.json();
       const answer = data.choices?.[0]?.message?.content;
       if (answer) {
-        return res.json({ success: true, answer, source: 'grok-ai' });
+        return res.json({ success: true, answer, source: 'groq-qwen-ai' });
       }
     }
 
-    const errData = await xaiRes.json().catch(() => ({}));
-    return res.status(xaiRes.status).json({ success: false, error: errData.error || 'Grok API Error' });
+    const errData = await groqRes.json().catch(() => ({}));
+    console.error('[Groq AI Chat Error]:', errData);
+    return res.status(groqRes.status).json({ success: false, error: errData.error?.message || 'Groq API Error' });
 
   } catch (err) {
+    console.error('[Groq AI Exception]:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 // Sarvam AI Translate Proxy Endpoint
 app.post('/api/sarvam-translate', async (req, res) => {
@@ -197,7 +200,7 @@ app.post('/api/crop-analyze', async (req, res) => {
 
   try {
     let endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-    let chosenModel = reqModel || process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview';
+    let chosenModel = reqModel || process.env.GROQ_VISION_MODEL || 'qwen/qwen3.8-27b';
 
     if (effectiveKey.startsWith('xai-')) {
       endpoint = 'https://api.x.ai/v1/chat/completions';
@@ -257,6 +260,7 @@ wss.on('connection', (clientWs, req) => {
   console.log('[xAI Voice Proxy] Client connected via WebSocket');
 
   // Extract query parameters if client passes explicit key or agent_id override
+  const urlParams = new URLSearchParams((req.url || '').split('?')[1] || '');
   const DEFAULT_KEY = process.env.XAI_API_KEY || '';
   const apiKey = urlParams.get('apiKey') || DEFAULT_KEY;
   const agentId = urlParams.get('agentId') || DEFAULT_AGENT_ID;
