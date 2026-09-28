@@ -60,10 +60,10 @@ export const HeroSection = ({ onStartFarm, onScanClick }) => {
             </p>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-4 pt-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
               <button
                 onClick={onStartFarm}
-                className="px-7 py-4 rounded-2xl bg-forest hover:bg-forest-light text-paper font-bold text-base shadow-elevated-farm flex items-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full sm:w-auto px-7 py-4 rounded-2xl bg-forest hover:bg-forest-light text-paper font-bold text-base shadow-elevated-farm flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-[0.98]"
               >
                 <span>{t('heroPrimaryCta')}</span>
                 <ArrowRight className="w-5 h-5 text-harvest-amber" />
@@ -74,7 +74,7 @@ export const HeroSection = ({ onStartFarm, onScanClick }) => {
                   const demoEl = document.getElementById('hero-demo-section');
                   demoEl?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="px-6 py-4 rounded-2xl bg-paper-card border border-paper-dark hover:border-forest text-forest font-bold text-base shadow-soft-natural flex items-center gap-2 transition-all hover:bg-paper-muted"
+                className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-paper-card border border-paper-dark hover:border-forest text-forest font-bold text-base shadow-soft-natural flex items-center justify-center gap-2 transition-all hover:bg-paper-muted"
               >
                 <Play className="w-4 h-4 fill-forest" />
                 <span>{t('heroSecondaryCta')}</span>

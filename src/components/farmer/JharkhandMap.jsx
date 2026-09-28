@@ -339,12 +339,12 @@ export const JharkhandMap = () => {
       <div className="bg-paper-card rounded-3xl p-4 border border-paper-dark shadow-soft-natural flex flex-col sm:flex-row items-center justify-between gap-4">
         
         {/* Division Filter Pills */}
-        <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
           {["All", "South Chotanagpur", "North Chotanagpur", "Santhal Pargana", "Palamu Division", "Kolhan Division"].map((div) => (
             <button
               key={div}
               onClick={() => setSelectedDivision(div)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
                 selectedDivision === div
                   ? 'bg-forest text-paper shadow-xs font-black'
                   : 'bg-paper-muted text-charcoal-muted hover:text-forest hover:bg-paper-dark/40'

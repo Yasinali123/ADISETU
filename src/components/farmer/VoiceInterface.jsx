@@ -204,10 +204,10 @@ export const VoiceInterface = () => {
 
         {/* Sub-Tab Switcher */}
         <div className="flex justify-center pt-2">
-          <div className="bg-paper-card border border-paper-dark p-1 rounded-2xl flex gap-1 shadow-inner">
+          <div className="bg-paper-card border border-paper-dark p-1 rounded-2xl flex flex-col sm:flex-row gap-1 shadow-inner w-full sm:w-auto">
             <button
               onClick={() => setActiveSubTab('assistant')}
-              className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+              className={`px-4 py-2.5 sm:py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
                 activeSubTab === 'assistant' 
                   ? 'bg-forest text-paper shadow-md' 
                   : 'text-charcoal-muted hover:text-forest'
@@ -219,7 +219,7 @@ export const VoiceInterface = () => {
             
             <button
               onClick={() => setActiveSubTab('studio')}
-              className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+              className={`px-4 py-2.5 sm:py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
                 activeSubTab === 'studio' 
                   ? 'bg-forest text-paper shadow-md' 
                   : 'text-charcoal-muted hover:text-forest'

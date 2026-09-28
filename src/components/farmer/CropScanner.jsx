@@ -143,7 +143,7 @@ export const CropScanner = ({ onVoiceClick }) => {
             <p className="text-[11px] font-bold text-charcoal-muted uppercase">
               Or Select Demo Leaf Sample:
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {sampleLeaves.map((item) => (
                 <button
                   key={item.id}
@@ -151,7 +151,7 @@ export const CropScanner = ({ onVoiceClick }) => {
                     setSelectedImage(item.url);
                     runAnalysis(item.url);
                   }}
-                  className={`p-1.5 rounded-xl border text-[11px] font-bold transition-all ${
+                  className={`p-2.5 sm:p-1.5 rounded-xl border text-xs font-bold transition-all text-center ${
                     selectedImage === item.url
                       ? 'border-harvest bg-harvest-pale text-forest'
                       : 'border-paper-dark bg-paper-card text-charcoal-muted hover:border-leaf'

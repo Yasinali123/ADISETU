@@ -80,7 +80,7 @@ export const VoiceAgentWidget = ({ onOpenVoiceTab }) => {
   return (
     <>
       {/* Floating Trigger Button */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-40">
         <button
           onClick={toggleWidget}
           className="group relative flex items-center gap-3 bg-gradient-to-r from-forest to-forest-dark text-paper p-3.5 sm:px-5 sm:py-3.5 rounded-full shadow-elevated-farm border-2 border-harvest hover:scale-105 active:scale-95 transition-all duration-300"
