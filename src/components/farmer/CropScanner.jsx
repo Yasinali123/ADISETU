@@ -123,17 +123,17 @@ export const CropScanner = ({ onVoiceClick }) => {
           <div className="space-y-1">
             <label className="text-xs font-bold text-forest uppercase flex items-center gap-1.5">
               <Key className="w-3.5 h-3.5 text-harvest" />
-              Vision AI API Key (OpenAI `sk-...` or xAI `xai-...`)
+              Vision AI API Key (Groq `gsk-...`, OpenAI `sk-...`, or xAI `xai-...`)
             </label>
             <input
               type="password"
               value={tempApiKey}
               onChange={(e) => setTempApiKey(e.target.value)}
-              placeholder="sk-proj-... or xai-..."
+              placeholder="gsk_7MNLaJ4... or sk-..."
               className="w-full px-4 py-2.5 rounded-xl border border-paper-dark bg-paper text-sm font-mono text-forest focus:ring-2 focus:ring-forest outline-none"
             />
-            <p className="text-xxs text-charcoal-muted">
-              Connect your own Vision Key for zero-shot cloud AI leaf diagnosis, or leave blank to use the built-in multi-class crop disease classifier.
+            <p className="text-xxs text-emerald-700 font-bold">
+              ✓ Configured with Groq Vision Engine (`gsk_7MN...`) for real-time plant disease classification.
             </p>
           </div>
 

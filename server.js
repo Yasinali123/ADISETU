@@ -182,60 +182,70 @@ app.post('/api/sarvam-tts', async (req, res) => {
   }
 });
 
-// AI Crop Leaf Computer Vision Analysis Endpoint
+// AI Crop Leaf Computer Vision Analysis Endpoint (Groq / OpenAI / xAI)
 app.post('/api/crop-analyze', async (req, res) => {
-  const { imageSrc, apiKey } = req.body;
+  const { imageSrc, apiKey, model: reqModel } = req.body;
 
   if (!imageSrc) {
     return res.status(400).json({ success: false, error: 'imageSrc is required' });
   }
 
-  // If client passes custom OpenAI or Grok Vision key
-  if (apiKey && (apiKey.startsWith('sk-') || apiKey.startsWith('xai-'))) {
-    try {
-      const endpoint = apiKey.startsWith('xai-')
-        ? 'https://api.x.ai/v1/chat/completions'
-        : 'https://api.openai.com/v1/chat/completions';
+  const effectiveKey = apiKey || process.env.GROQ_API_KEY || process.env.XAI_API_KEY || '';
+  if (!effectiveKey) {
+    return res.json({ success: true, analysis: null, message: 'No Vision API key configured' });
+  }
 
-      const model = apiKey.startsWith('xai-') ? 'grok-2-vision-latest' : 'gpt-4o-mini';
+  try {
+    let endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+    let chosenModel = reqModel || process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview';
 
-      const visionRes = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: 'Analyze this plant leaf crop photo. Respond ONLY in valid JSON with keys: diseaseId (string), name (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string), severityLevel (number 1-3), symptoms (object with hi, sat, en strings), actions (object with hi, sat, en arrays of 3 action step strings), weatherAlert (object with hi, sat, en strings).'
-                },
-                {
-                  type: 'image_url',
-                  image_url: { url: imageSrc }
-                }
-              ]
-            }
-          ],
-          temperature: 0.2
-        })
-      });
-
-      if (visionRes.ok) {
-        const data = await visionRes.json();
-        const content = data.choices?.[0]?.message?.content || '';
-        const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-        return res.json({ success: true, analysis: parsed, provider: model });
-      }
-    } catch (err) {
-      console.warn('[Crop Vision Server] Vision API call failed, falling back:', err);
+    if (effectiveKey.startsWith('xai-')) {
+      endpoint = 'https://api.x.ai/v1/chat/completions';
+      chosenModel = 'grok-2-vision-latest';
+    } else if (effectiveKey.startsWith('sk-')) {
+      endpoint = 'https://api.openai.com/v1/chat/completions';
+      chosenModel = 'gpt-4o-mini';
     }
+
+    const visionRes = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${effectiveKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: chosenModel,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Analyze this crop leaf photo. Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string), severityLevel (number 1-3), symptoms (object with hi, sat, en strings), actions (object with hi, sat, en arrays of 3 action step strings), weatherAlert (object with hi, sat, en strings).'
+              },
+              {
+                type: 'image_url',
+                image_url: { url: imageSrc }
+              }
+            ]
+          }
+        ],
+        temperature: 0.2
+      })
+    });
+
+    if (visionRes.ok) {
+      const data = await visionRes.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      return res.json({ success: true, analysis: parsed, provider: chosenModel });
+    } else {
+      const errData = await visionRes.json().catch(() => ({}));
+      console.warn('[Crop Vision Server] Provider returned HTTP', visionRes.status, errData);
+    }
+  } catch (err) {
+    console.warn('[Crop Vision Server] Vision API call failed, falling back:', err);
   }
 
   return res.json({ success: true, analysis: null });
