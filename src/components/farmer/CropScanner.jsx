@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { analyzeCropImage } from '../../api/cropApi';
-import { Camera, Upload, Mic, RefreshCw, Volume2, ShieldCheck, AlertTriangle, CheckCircle, Info, CloudRain, Sparkles } from 'lucide-react';
+import { Camera, Upload, Mic, RefreshCw, Volume2, ShieldCheck, AlertTriangle, CheckCircle, Info, CloudRain, Sparkles, Settings, Key, Cpu } from 'lucide-react';
 
 export const CropScanner = ({ onVoiceClick }) => {
   const { lang, t, playAudioResponse, isPlayingAudio, stopAudio } = useLanguage();
@@ -11,6 +11,9 @@ export const CropScanner = ({ onVoiceClick }) => {
   );
   const [isScanning, setIsScanning] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [visionApiKey, setVisionApiKey] = useState(localStorage.getItem('vision_api_key') || '');
+  const [tempApiKey, setTempApiKey] = useState(visionApiKey);
 
   // Preset leaf sample photos for immediate farmer demo testing
   const sampleLeaves = [
@@ -40,13 +43,25 @@ export const CropScanner = ({ onVoiceClick }) => {
     }
   };
 
+  const handleSaveSettings = (e) => {
+    e.preventDefault();
+    setVisionApiKey(tempApiKey);
+    if (tempApiKey) {
+      localStorage.setItem('vision_api_key', tempApiKey);
+    } else {
+      localStorage.removeItem('vision_api_key');
+    }
+    setShowSettings(false);
+    if (selectedImage) runAnalysis(selectedImage);
+  };
+
   const runAnalysis = async (imgUrl) => {
     setIsScanning(true);
     setAnalysisResult(null);
     stopAudio();
 
     try {
-      const result = await analyzeCropImage(imgUrl);
+      const result = await analyzeCropImage(imgUrl, visionApiKey);
       setAnalysisResult(result);
     } catch (err) {
       console.error(err);
@@ -68,10 +83,22 @@ export const CropScanner = ({ onVoiceClick }) => {
     <section className="py-8 max-w-5xl mx-auto space-y-8">
       
       {/* Header */}
-      <div className="text-center space-y-2">
-        <span className="text-xs font-black uppercase tracking-widest text-harvest bg-harvest-pale px-3 py-1 rounded-full">
-          AI Computer Vision Scanner
-        </span>
+      <div className="text-center space-y-2 relative">
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-xs font-black uppercase tracking-widest text-harvest bg-harvest-pale px-3 py-1 rounded-full flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5" />
+            AI Computer Vision Scanner
+          </span>
+
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="p-1.5 rounded-full bg-paper border border-paper-dark text-charcoal hover:text-forest transition-all"
+            title="Configure Vision API Key (OpenAI / Vision AI)"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
+
         <h2 className="text-3xl sm:text-4xl font-black text-forest">
           {t('scannerTitle')}
         </h2>
@@ -79,6 +106,45 @@ export const CropScanner = ({ onVoiceClick }) => {
           {t('scannerSub')}
         </p>
       </div>
+
+      {/* Vision API Key Modal Settings */}
+      {showSettings && (
+        <form onSubmit={handleSaveSettings} className="bg-paper-card border-2 border-forest-light rounded-3xl p-6 shadow-xl space-y-4 animate-fadeIn">
+          <div className="flex items-center justify-between border-b border-paper-dark pb-3">
+            <h3 className="text-base font-bold text-forest flex items-center gap-2">
+              <Cpu className="w-5 h-5 text-harvest" />
+              Vision AI Model & API Key Settings
+            </h3>
+            <button type="button" onClick={() => setShowSettings(false)} className="text-xs font-bold text-charcoal-muted hover:text-forest">
+              ✕ Close
+            </button>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-bold text-forest uppercase flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5 text-harvest" />
+              Vision AI API Key (OpenAI `sk-...` or xAI `xai-...`)
+            </label>
+            <input
+              type="password"
+              value={tempApiKey}
+              onChange={(e) => setTempApiKey(e.target.value)}
+              placeholder="sk-proj-... or xai-..."
+              className="w-full px-4 py-2.5 rounded-xl border border-paper-dark bg-paper text-sm font-mono text-forest focus:ring-2 focus:ring-forest outline-none"
+            />
+            <p className="text-xxs text-charcoal-muted">
+              Connect your own Vision Key for zero-shot cloud AI leaf diagnosis, or leave blank to use the built-in multi-class crop disease classifier.
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="submit" className="px-5 py-2 rounded-xl bg-forest text-paper font-bold text-xs hover:bg-forest-dark transition-all">
+              Save Vision Settings
+            </button>
+          </div>
+        </form>
+      )}
+
 
       {/* Main Upload / Camera & Analysis Area */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
