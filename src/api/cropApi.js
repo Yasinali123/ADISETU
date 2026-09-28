@@ -1,6 +1,6 @@
 /**
  * AI Computer Vision & Crop Health Intelligence Engine
- * ADISETU Agricultural Diagnostic Engine powered by Groq Vision (qwen/qwen3.8-27b)
+ * ADISETU Agricultural Diagnostic Engine powered by Groq Vision (llama-3.2-11b-vision-preview)
  */
 
 export const CROP_DISEASES = {
@@ -85,122 +85,127 @@ export const CROP_DISEASES = {
     }
   },
 
-  healthy_crop: {
-    diseaseId: "healthy_crop",
-    name: "Healthy Crop Leaf (No Disease Detected)",
-    crop: "All Crops",
+  maize_armyworm: {
+    diseaseId: "maize_armyworm",
+    name: "Fall Armyworm (Spodoptera frugiperda)",
+    crop: "Maize / Corn",
     localNames: {
-      hi: "स्वस्थ फसल (कोई बीमारी नहीं)",
-      sat: "ᱱᱟᱯᱟᱭ ᱪᱟᱥ ( align ᱚᱠᱟ ᱨᱚᱜᱽ ᱦᱚᱸ ᱵᱟᱹᱱᱩᱜ-ᱟ)",
-      en: "Healthy Crop Leaf"
+      hi: "मक्के का फॉल आर्मीवर्म (Armyworm)",
+      sat: " Fall Armyworm ( ᱢ ᱟ absolute ᱠ precisely ᱟ absolute)",
+      en: "Maize Fall Armyworm"
     },
-    confidence: 97,
-    severity: "Optimal Health",
-    severityLevel: 1,
+    confidence: 90,
+    severity: "High Risk",
+    severityLevel: 3,
     symptoms: {
-      en: "Dark green uniform leaf pigmentation, robust cell wall structure, and zero fungal or insect damage spots.",
-      hi: "गहरा हरा रंग, मजबूत पत्तियां और कोई कीड़ा या फफूंद का लक्षण नहीं। फसल पूरी तरह स्वस्थ है।",
-      sat: "ᱜᱟ deep ᱦᱟᱹᱨᱤᱭᱟᱹᱲ ᱨᱚᱝ, ᱠᱮᱴᱮᱡ ᱥᱟᱠᱟᱢ ᱟᱨ ᱚᱠᱟ ᱛᱤᱡᱩ/ᱨᱚᱜᱽ ᱵᱟᱹᱱᱩᱜ-ᱟ᱾"
+      en: "Torn leaves with window-pane feeding holes and sawdust-like frass inside the central leaf whorl.",
+      hi: "मक्के की पत्तियों में छिद्र और केंद्रीय पोंगे में भूसे जैसा कीड़े का मल।",
+      sat: "ᱢᱟᱠᱟᱭ ᱥᱟᱠᱟᱢ ᱨᱮ ᱜᱮᱫ ᱫᱟᱜ ᱧᱮᱞᱚᱜ-ᱟ᱾"
     },
     actions: {
       en: [
-        "Maintain current balanced irrigation and organic compost schedule.",
-        "Apply Trichoderma bio-agent as preventive root protection.",
-        "Monitor weekly for early signs of seasonal pests."
+        "Apply 5% Neem seed kernel extract (NSKE) inside the leaf whorl.",
+        "Spray Emamectin Benzoate 5% SG @ 0.4 g/liter of water during evening.",
+        "Set up pheromone traps @ 4 traps/acre for adult moth monitoring."
       ],
       hi: [
-        "फसल का संतुलित सिंचाई चक्र बनाए रखें।",
-        "जैविक सुरक्षा के लिए गोबर खाद या वर्मीकंपोस्ट डालते रहें।",
-        "साप्ताहिक रूप से फसल की निगरानी जारी रखें।"
+        "मक्के के पोंगे में नीम तेल या नीम की खली का पाउडर डालें।",
+        "इमामेक्टिन बेंजोएट 5% SG (0.4 ग्राम प्रति लीटर) का शाम को छिड़काव करें।",
+        "खेत में फेरोमोन ट्रैप लगाएं।"
       ],
       sat: [
-        "ᱱᱟᱯᱟᱭ ᱫᱟᱜ ᱫᱩᱞ ᱟᱨ FYM ᱠᱷᱟᱛ ᱮᱢ ᱢᱮ᱾"
+        "ᱱᱤᱢ ᱥᱩᱱᱩᱢ 5ml/L Emamectin Benzoate 0.4g/L ᱪᱟᱯᱟᱰ ᱢᱮ᱾"
       ]
     },
     weatherAlert: {
-      en: "Favorable weather conditions for healthy crop canopy development.",
-      hi: "फसल के अच्छे विकास के लिए मौसम अनुकूल है।",
-      sat: "ᱪᱟᱥ ᱦᱟᱨᱟ lightning ᱞᱟᱹᱜᱤᱫ ᱥᱮᱨᱢᱟ ᱟᱹᱰᱤ ᱱᱟᱯᱟᱭ ᱢᱮᱱᱟᱜ-ᱟ᱾"
+      en: "Warm temperatures increase armyworm moth egg hatching speed.",
+      hi: "बढ़ते तापमान से आर्मीवर्म कीट के अंडे तेजी से फूट रहे हैं।",
+      sat: "ᱥᱤᱛᱩᱝ ᱠᱷᱟᱹᱛᱤᱨ ᱛᱤᱡᱩ ᱞᱚᱜᱚᱱ ᱠᱚ ᱡᱟᱱᱟᱢᱚᱜ ᱠᱟᱱᱟ᱾"
     }
   }
 };
 
 /**
- * Intelligent Image & Computer Vision Classifier via Groq Vision (qwen/qwen3.8-27b)
+ * Intelligent Image & Computer Vision Classifier via Groq Vision (llama-3.2-11b-vision-preview)
+ * STRICT LIVE ONLY - No default fallback answers.
  */
 export const analyzeCropImage = async (imageSrc, customApiKey = '') => {
   const apiKey = customApiKey || localStorage.getItem('groq_api_key') || localStorage.getItem('xai_api_key') || '';
 
-  // 1. Try server endpoint
+  // 1. Try server Vision endpoint
   try {
     const res = await fetch('/api/crop-analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ imageSrc, apiKey, model: 'llama-3.2-11b-vision-preview' })
     });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.analysis) {
-        return data.analysis;
-      }
+    const data = await res.json();
+    if (res.ok && data.success && data.analysis) {
+      return data.analysis;
+    }
+    if (data && data.error) {
+      throw new Error(data.error);
     }
   } catch (err) {
-    console.warn('[Crop Vision API] Server endpoint unavailable, trying direct Groq Vision API:', err);
+    console.warn('[Crop Vision API] Server endpoint error:', err);
+    if (err.message && !err.message.includes('fetch')) {
+      throw err;
+    }
   }
 
   // 2. Direct Groq Vision API Call (llama-3.2-11b-vision-preview)
   const effectiveKey = apiKey || import.meta.env.VITE_GROQ_API_KEY || '';
-  if (effectiveKey) {
-    try {
-      const visionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${effectiveKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'llama-3.2-11b-vision-preview',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: 'You are an agricultural plant pathologist and entomologist. Analyze this crop photo for pests, insects, caterpillars, borers, aphids, whiteflies, or leaf diseases. Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string), severityLevel (number 1-3), symptoms (object with hi, sat, en strings), actions (object with hi, sat, en arrays of 3 action step strings), weatherAlert (object with hi, sat, en strings).'
-                },
-                {
-                  type: 'image_url',
-                  image_url: { url: imageSrc }
-                }
-              ]
-            }
-          ],
-          temperature: 0.1,
-          max_tokens: 600
-        })
-      });
+  if (!effectiveKey) {
+    throw new Error('No Groq Vision API Key configured. Please add your Groq API Key in settings to analyze images.');
+  }
 
-      if (visionRes.ok) {
-        const data = await visionRes.json();
-        const content = data.choices?.[0]?.message?.content || '';
-        const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-        if (parsed && parsed.name) {
-          return parsed;
-        }
+  try {
+    const visionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${effectiveKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.2-11b-vision-preview',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'You are an expert agricultural plant pathologist and entomologist. Analyze this crop photo for pests, insects, caterpillars, borers, aphids, whiteflies, or leaf diseases. Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string), severityLevel (number 1-3), symptoms (object with hi, sat, en strings), actions (object with hi, sat, en arrays of 3 action step strings), weatherAlert (object with hi, sat, en strings).'
+              },
+              {
+                type: 'image_url',
+                image_url: { url: imageSrc }
+              }
+            ]
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 600
+      })
+    });
+
+    const data = await visionRes.json();
+    if (visionRes.ok) {
+      const content = data.choices?.[0]?.message?.content || '';
+      const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      if (parsed && parsed.name) {
+        return parsed;
       }
-    } catch (err) {
-      console.warn('[Direct Vision Exception]:', err);
     }
+    
+    if (data.error && data.error.message) {
+      throw new Error(`Groq Vision Error: ${data.error.message}`);
+    }
+  } catch (err) {
+    throw err;
   }
 
-  // 3. Fallback based on image name or characteristics if offline/unparseable
-  const lower = (imageSrc || '').toLowerCase();
-  if (lower.includes('pest') || lower.includes('bug') || lower.includes('worm') || lower.includes('armyworm') || lower.includes('insect')) {
-    return CROP_DISEASES.maize_armyworm;
-  }
-
-  return CROP_DISEASES.tomato_early_blight;
+  throw new Error('Unable to parse crop image analysis. Please try uploading a clearer crop photo.');
 };
 
 export const getCropRecommendations = async (params) => {

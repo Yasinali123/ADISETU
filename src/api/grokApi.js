@@ -1,6 +1,7 @@
 /**
  * Groq AI Agricultural REST API Client & Live Reasoning Engine
  * Powered by Groq qwen/qwen3.8-27b Model
+ * STRICT LIVE ONLY - No static default fallback answers.
  */
 
 const DEFAULT_GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
@@ -25,11 +26,12 @@ export const askGrokAI = async (question, language = 'hi', customApiKey = '') =>
       })
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      if (data.answer) {
-        return data.answer;
-      }
+    const data = await response.json();
+    if (response.ok && data.answer) {
+      return data.answer;
+    }
+    if (data && data.error) {
+      return `[AI Notice]: ${data.error}`;
     }
   } catch (err) {
     console.warn('[Groq AI] Backend API call failed, attempting direct Groq API:', err);
@@ -37,7 +39,10 @@ export const askGrokAI = async (question, language = 'hi', customApiKey = '') =>
 
   // 2. Direct Groq Cloud API Call (Client-Side fallback to qwen/qwen3.8-27b)
   const effectiveKey = apiKey || DEFAULT_GROQ_KEY;
-  
+  if (!effectiveKey) {
+    return 'No Groq API Key configured. Please add your Groq API key to use the live AI advisor.';
+  }
+
   const systemPrompt = language === 'hi' 
     ? 'आप ADISETU AI हैं, जो झारखंड के किसानों के कृषि सलाहकार हैं। किसान के कृषि प्रश्न का गहरा विश्लेषण करें और सरल, व्यावहारिक, सटीक सलाह 2-3 वाक्यों में दें ताकि इसे आसानी से पढ़कर सुनाया जा सके।'
     : language === 'sat'
@@ -62,16 +67,17 @@ export const askGrokAI = async (question, language = 'hi', customApiKey = '') =>
       })
     });
 
-    if (groqRes.ok) {
-      const data = await groqRes.json();
-      const answer = data.choices?.[0]?.message?.content;
-      if (answer) return answer;
+    const data = await groqRes.json();
+    if (groqRes.ok && data.choices?.[0]?.message?.content) {
+      return data.choices[0].message.content;
+    }
+    if (data.error && data.error.message) {
+      return `[AI Error]: ${data.error.message}`;
     }
   } catch (err) {
     console.error('[Groq AI Direct Error]:', err);
+    return `[Network Error]: Unable to connect to Groq AI service (${err.message}).`;
   }
 
-  return language === 'hi'
-    ? 'क्षमा करें, AI मॉडल सेवा से संपर्क नहीं हो पाया। कृपया अपना प्रश्न पुनः पूछें।'
-    : 'Sorry, could not connect to the live AI engine. Please check your network connection and try again.';
+  return 'Could not process query with AI model. Please try again.';
 };

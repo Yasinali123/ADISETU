@@ -14,6 +14,7 @@ export const CropScanner = ({ onVoiceClick }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [visionApiKey, setVisionApiKey] = useState(localStorage.getItem('vision_api_key') || '');
   const [tempApiKey, setTempApiKey] = useState(visionApiKey);
+  const [scanError, setScanError] = useState(null);
 
   // Preset leaf sample photos for immediate farmer demo testing
   const sampleLeaves = [
@@ -58,6 +59,7 @@ export const CropScanner = ({ onVoiceClick }) => {
   const runAnalysis = async (imgUrl) => {
     setIsScanning(true);
     setAnalysisResult(null);
+    setScanError(null);
     stopAudio();
 
     try {
@@ -65,6 +67,7 @@ export const CropScanner = ({ onVoiceClick }) => {
       setAnalysisResult(result);
     } catch (err) {
       console.error(err);
+      setScanError(err.message || 'Vision AI analysis failed');
     } finally {
       setIsScanning(false);
     }
@@ -234,7 +237,24 @@ export const CropScanner = ({ onVoiceClick }) => {
         {/* Right Side: AI Diagnosis & Actionable Insights */}
         <div className="lg:col-span-7 space-y-6">
           
-          {/* If analysis not run yet */}
+          {/* Error Card */}
+          {scanError && !isScanning && (
+            <div className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-6 text-center space-y-3 shadow-soft-natural animate-fadeIn">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-rose-900">Vision Analysis Error</h3>
+              <p className="text-xs text-rose-700 font-medium max-w-md mx-auto">
+                {scanError}
+              </p>
+              <button
+                onClick={() => runAnalysis(selectedImage)}
+                className="px-5 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition-all shadow-sm"
+              >
+                Retry Analysis
+              </button>
+            </div>
+          )}
           {!analysisResult && !isScanning && (
             <div className="bg-paper-card rounded-3xl p-8 border border-paper-dark text-center space-y-4 shadow-soft-natural">
               <div className="w-16 h-16 rounded-2xl bg-harvest-pale text-harvest flex items-center justify-center mx-auto">
