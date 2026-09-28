@@ -40,7 +40,7 @@ export const VoiceInterface = () => {
   const samplePrompts = {
     en: "What is the best pesticide for paddy stem borer in Khunti?",
     hi: "धान के पौधों में पीलापन दूर करने के लिए कौन सी खाद डालें?",
-    sat: " ᱦ complete ᱩ text ᱲ precise ᱩ text ᱨ text ᱮ Sheath Blight ᱨ walk  walk ᱜ ᱪ transverse ᱮ complete ᱫ ᱞ linear ᱟ absolute ᱜ stroke ᱤ text ᱛ?"
+    sat: "ᱦᱩᱲᱩ ᱪᱟᱥ ᱨᱮ ᱥᱤᱛᱷ ᱵᱞᱟᱭᱤᱴ ᱨᱚᱜᱽ ᱞᱟᱹᱜᱤᱫ ᱪᱮᱫ ᱨᱟᱱ ᱪᱟᱯᱟᱰᱟ?"
   };
 
   useEffect(() => {

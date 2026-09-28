@@ -20,7 +20,7 @@ export const HeroSection = ({ onStartFarm, onScanClick }) => {
 
   const handleAudioDemoPlay = () => {
     const textToPlay = lang === 'sat'
-      ? " ᱟ double ᱢ ᱟ absolute ᱜ ᱴ transverse  walk ᱢ ᱟ composite ᱴ precise ᱨ ᱨ traditional ᱮ Early Blight ᱨ structured  walk ᱜ ᱧ walking ᱮ transverse ᱞ standard  walk cross ᱠ ᱟ absolute ᱱ ᱟ absolute᱾ ᱫ walk ᱟ absolute ᱝ ᱞ transverse ᱟ absolute ᱦ walking ᱟ Copper Oxychloride ᱮ completely ᱨ walk ᱮ ᱢ standard ᱮ᱾"
+      ? "ᱟᱢᱟᱜ ᱴᱚᱢᱟᱴᱚ ᱪᱟᱥ ᱨᱮ Early Blight ᱨᱚᱜᱽ ᱧᱮᱞᱚᱜ ᱠᱟᱱᱟ᱾ ᱫᱟᱜ ᱞᱟᱦᱟ ᱨᱮ Copper Oxychloride ᱪᱟᱯᱟᱰ ᱢᱮ᱾"
       : "आपके टमाटर के पौधे में अगेती झुलसा के लक्षण हैं। बारिश से पहले ऑर्गेनिक कॉपर ऑक्सीक्लोराइड का छिड़काव करें।";
     
     playAudioResponse(textToPlay);
