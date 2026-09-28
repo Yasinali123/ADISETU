@@ -56,24 +56,6 @@ app.post('/api/grok-chat', async (req, res) => {
       })
     });
 
-  try {
-    const xaiRes = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${key}`
-      },
-      body: JSON.stringify({
-        model: 'grok-2-latest',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: question }
-        ],
-        temperature: 0.6,
-        max_tokens: 300
-      })
-    });
-
     if (xaiRes.ok) {
       const data = await xaiRes.json();
       const answer = data.choices?.[0]?.message?.content;
