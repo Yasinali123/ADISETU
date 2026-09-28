@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: adisetu-agricultural-ai
+    env: node
+    plan: free
+    region: singapore # or oregon, frankfurt, etc.
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: XAI_API_KEY
+        sync: false
+      - key: XAI_AGENT_ID
+        value: agent_hqm1pHqkbVkCk2dJ
+      - key: SARVAM_API_KEY
+        sync: false

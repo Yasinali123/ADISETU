@@ -3,12 +3,18 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
 
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws-xai' });
@@ -298,6 +304,17 @@ wss.on('connection', (clientWs, req) => {
       xaiWs.close();
     }
   });
+});
+
+// Serve frontend build from dist folder for production deployment (Render)
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// Fallback all non-API GET requests to index.html for React SPA client routing
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/ws')) {
+    return next();
+  }
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 const PORT = process.env.PORT || 3001;
