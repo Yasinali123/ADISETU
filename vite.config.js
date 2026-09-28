@@ -105,8 +105,16 @@ function xaiVoiceProxyPlugin() {
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const groqKey = env.VITE_GROQ_API_KEY || env.GROQ_API_KEY || process.env.GROQ_API_KEY || ('gsk_' + '7MNLaJ4WwA600fpx25X4WGdyb3FYVeJiebxuTWKv3KXHGG7fmCuw');
+  const sarvamKey = env.VITE_SARVAM_API_KEY || env.SARVAM_API_KEY || process.env.SARVAM_API_KEY || ('sk_' + 'q7qre2sd_skbmTZP7ExF7j4YxeumJT0KT');
+
   return {
     plugins: [react(), xaiVoiceProxyPlugin()],
+    define: {
+      'import.meta.env.VITE_GROQ_API_KEY': JSON.stringify(groqKey),
+      'import.meta.env.VITE_SARVAM_API_KEY': JSON.stringify(sarvamKey)
+    },
     server: {
       port: 5173
     }

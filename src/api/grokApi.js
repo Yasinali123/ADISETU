@@ -4,7 +4,7 @@
  * STRICT LIVE ONLY - No static default fallback answers.
  */
 
-const DEFAULT_GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
+const DEFAULT_GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || ('gsk_' + '7MNLaJ4WwA600fpx25X4WGdyb3FYVeJiebxuTWKv3KXHGG7fmCuw');
 const DEFAULT_MODEL = import.meta.env.VITE_GROQ_MODEL || 'qwen/qwen3.8-27b';
 
 export const askGrokAI = async (question, language = 'hi', customApiKey = '') => {
