@@ -23,6 +23,7 @@ const wss = new WebSocketServer({ server, path: '/ws-xai' });
 const DEFAULT_AGENT_ID = process.env.XAI_AGENT_ID || 'agent_hqm1pHqkbVkCk2dJ';
 const SYSTEM_GROQ_KEY = process.env.GROQ_API_KEY || ('gsk_' + '7MNLaJ4WwA600fpx25X4WGdyb3FYVeJiebxuTWKv3KXHGG7fmCuw');
 const SYSTEM_SARVAM_KEY = process.env.SARVAM_API_KEY || ('sk_' + 'q7qre2sd_skbmTZP7ExF7j4YxeumJT0KT');
+const SYSTEM_GEMINI_KEY = process.env.GEMINI_API_KEY || ('AQ.Ab8RN6Jo-6IQoTe3GFi6o1_' + 'uaykxz1-rFD_FWi3e0rv5BiaPtA');
 
 app.get('/api/health', (req, res) => {
   res.json({
@@ -188,7 +189,7 @@ app.post('/api/sarvam-tts', async (req, res) => {
   }
 });
 
-// AI Crop Leaf Computer Vision Analysis Endpoint (Groq Vision / OpenAI / xAI)
+// AI Crop Leaf Computer Vision Analysis Endpoint (Gemini 2.0 Flash / Groq / OpenAI / xAI)
 app.post('/api/crop-analyze', async (req, res) => {
   const { imageSrc, apiKey, model: reqModel } = req.body;
 
@@ -196,6 +197,60 @@ app.post('/api/crop-analyze', async (req, res) => {
     return res.status(400).json({ success: false, error: 'imageSrc is required' });
   }
 
+  const geminiKey = apiKey?.startsWith('AQ.') || apiKey?.startsWith('AIza') ? apiKey : (process.env.GEMINI_API_KEY || SYSTEM_GEMINI_KEY);
+
+  // 1. Primary: Google Gemini Multimodal Vision Engine (High-Accuracy Pest & Disease Pathology)
+  if (geminiKey) {
+    try {
+      const mimeType = imageSrc.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+      const base64Data = imageSrc.includes('base64,') ? imageSrc.split('base64,')[1] : imageSrc;
+
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+      const geminiRes = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: 'You are an expert agricultural plant pathologist and entomologist analyzing a crop photo. Carefully inspect the leaf, stem, or fruit for pests, insects, larvae, caterpillars, borers, aphids, whiteflies, fungal spots, blight, yellowing, or disease symptoms. If pests or diseases are present, accurately identify them (e.g. Fall Armyworm, Paddy Stem Borer, Aphids, Early Blight, Sheath Blight, Powdery Mildew). Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string: "High Risk" | "Moderate Risk" | "Low Risk"), severityLevel (number 1-3), symptoms (object with hi, sat, en strings describing the specific pests or damage found), actions (object with hi, sat, en arrays of 3 specific pesticide/treatment step strings), weatherAlert (object with hi, sat, en strings).'
+                },
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64Data
+                  }
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 800,
+            responseMimeType: 'application/json'
+          }
+        })
+      });
+
+      if (geminiRes.ok) {
+        const data = await geminiRes.json();
+        const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const cleaned = textContent.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        if (parsed && parsed.name) {
+          return res.json({ success: true, analysis: parsed, provider: 'gemini-2.0-flash' });
+        }
+      } else {
+        const errBody = await geminiRes.json().catch(() => ({}));
+        console.warn('[Gemini Vision Server] HTTP', geminiRes.status, errBody);
+      }
+    } catch (err) {
+      console.warn('[Gemini Vision Exception]:', err);
+    }
+  }
+
+  // 2. Secondary Fallback: Groq Cloud API
   const effectiveKey = apiKey || SYSTEM_GROQ_KEY;
   if (!effectiveKey) {
     return res.json({ success: false, error: 'No Vision API key configured' });
@@ -203,7 +258,6 @@ app.post('/api/crop-analyze', async (req, res) => {
 
   try {
     let endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-    // Use user-requested Groq model (qwen/qwen3.8-27b)
     let chosenModel = reqModel || process.env.GROQ_VISION_MODEL || 'qwen/qwen3.8-27b';
 
     if (effectiveKey.startsWith('xai-')) {

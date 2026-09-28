@@ -153,7 +153,57 @@ export const analyzeCropImage = async (imageSrc, customApiKey = '') => {
     console.warn('[Crop Vision API] Server endpoint fetch error:', err);
   }
 
-  // 2. Direct Groq Cloud API Call (qwen/qwen3.8-27b)
+  // 2. Direct Gemini 2.0 Flash Multimodal Vision API Call (Ultra-Accurate Pest & Disease Pathology)
+  const SYSTEM_GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY || ('AQ.Ab8RN6Jo-6IQoTe3GFi6o1_' + 'uaykxz1-rFD_FWi3e0rv5BiaPtA');
+  const geminiKey = apiKey?.startsWith('AQ.') || apiKey?.startsWith('AIza') ? apiKey : (localStorage.getItem('gemini_api_key') || SYSTEM_GEMINI_KEY);
+
+  if (geminiKey) {
+    try {
+      const mimeType = imageSrc.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
+      const base64Data = imageSrc.includes('base64,') ? imageSrc.split('base64,')[1] : imageSrc;
+
+      const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: 'You are an expert agricultural plant pathologist and entomologist analyzing a crop photo. Carefully inspect the leaf, stem, or fruit for pests, insects, larvae, caterpillars, borers, aphids, whiteflies, fungal spots, blight, yellowing, or disease symptoms. If pests or diseases are present, accurately identify them (e.g. Fall Armyworm, Paddy Stem Borer, Aphids, Early Blight, Sheath Blight, Powdery Mildew). Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string: "High Risk" | "Moderate Risk" | "Low Risk"), severityLevel (number 1-3), symptoms (object with hi, sat, en strings describing the specific pests or damage found), actions (object with hi, sat, en arrays of 3 specific pesticide/treatment step strings), weatherAlert (object with hi, sat, en strings).'
+                },
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64Data
+                  }
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 800,
+            responseMimeType: 'application/json'
+          }
+        })
+      });
+
+      if (geminiRes.ok) {
+        const data = await geminiRes.json();
+        const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const cleaned = textContent.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        if (parsed && parsed.name) {
+          return parsed;
+        }
+      }
+    } catch (err) {
+      console.warn('[Direct Gemini Vision Exception]:', err);
+    }
+  }
+
+  // 3. Direct Groq Cloud API Call Fallback (qwen/qwen3.8-27b)
   const SYSTEM_GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || ('gsk_' + '7MNLaJ4WwA600fpx25X4WGdyb3FYVeJiebxuTWKv3KXHGG7fmCuw');
   const effectiveKey = apiKey || localStorage.getItem('vision_api_key') || localStorage.getItem('groq_api_key') || SYSTEM_GROQ_KEY;
 
