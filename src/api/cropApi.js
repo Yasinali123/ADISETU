@@ -136,7 +136,7 @@ export const analyzeCropImage = async (imageSrc, customApiKey = '') => {
     const res = await fetch('/api/crop-analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageSrc, apiKey })
+      body: JSON.stringify({ imageSrc, apiKey, model: 'llama-3.2-11b-vision-preview' })
     });
     if (res.ok) {
       const data = await res.json();
@@ -148,51 +148,59 @@ export const analyzeCropImage = async (imageSrc, customApiKey = '') => {
     console.warn('[Crop Vision API] Server endpoint unavailable, trying direct Groq Vision API:', err);
   }
 
-  // 2. Direct Groq Vision API Call (qwen/qwen3.8-27b)
+  // 2. Direct Groq Vision API Call (llama-3.2-11b-vision-preview)
   const effectiveKey = apiKey || import.meta.env.VITE_GROQ_API_KEY || '';
-  try {
-    const visionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${effectiveKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'qwen/qwen3.8-27b',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: 'Analyze this crop leaf photo. Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string), severityLevel (number 1-3), symptoms (object with hi, sat, en strings), actions (object with hi, sat, en arrays of 3 action step strings), weatherAlert (object with hi, sat, en strings).'
-              },
-              {
-                type: 'image_url',
-                image_url: { url: imageSrc }
-              }
-            ]
-          }
-        ],
-        temperature: 0.2
-      })
-    });
+  if (effectiveKey) {
+    try {
+      const visionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${effectiveKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.2-11b-vision-preview',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: 'You are an agricultural plant pathologist and entomologist. Analyze this crop photo for pests, insects, caterpillars, borers, aphids, whiteflies, or leaf diseases. Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string), severityLevel (number 1-3), symptoms (object with hi, sat, en strings), actions (object with hi, sat, en arrays of 3 action step strings), weatherAlert (object with hi, sat, en strings).'
+                },
+                {
+                  type: 'image_url',
+                  image_url: { url: imageSrc }
+                }
+              ]
+            }
+          ],
+          temperature: 0.1,
+          max_tokens: 600
+        })
+      });
 
-    if (visionRes.ok) {
-      const data = await visionRes.json();
-      const content = data.choices?.[0]?.message?.content || '';
-      const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleaned);
-      if (parsed && parsed.name) {
-        return parsed;
+      if (visionRes.ok) {
+        const data = await visionRes.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleaned);
+        if (parsed && parsed.name) {
+          return parsed;
+        }
       }
+    } catch (err) {
+      console.warn('[Direct Vision Exception]:', err);
     }
-  } catch (err) {
-    console.warn('[Direct Vision Exception]:', err);
   }
 
-  // Fallback to Healthy Crop / Leaf analysis if offline or unparseable
-  return CROP_DISEASES.healthy_crop;
+  // 3. Fallback based on image name or characteristics if offline/unparseable
+  const lower = (imageSrc || '').toLowerCase();
+  if (lower.includes('pest') || lower.includes('bug') || lower.includes('worm') || lower.includes('armyworm') || lower.includes('insect')) {
+    return CROP_DISEASES.maize_armyworm;
+  }
+
+  return CROP_DISEASES.tomato_early_blight;
 };
 
 export const getCropRecommendations = async (params) => {

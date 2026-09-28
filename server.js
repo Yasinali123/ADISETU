@@ -186,7 +186,7 @@ app.post('/api/sarvam-tts', async (req, res) => {
   }
 });
 
-// AI Crop Leaf Computer Vision Analysis Endpoint (Groq / OpenAI / xAI)
+// AI Crop Leaf Computer Vision Analysis Endpoint (Groq Vision / OpenAI / xAI)
 app.post('/api/crop-analyze', async (req, res) => {
   const { imageSrc, apiKey, model: reqModel } = req.body;
 
@@ -196,12 +196,13 @@ app.post('/api/crop-analyze', async (req, res) => {
 
   const effectiveKey = apiKey || process.env.GROQ_API_KEY || process.env.XAI_API_KEY || '';
   if (!effectiveKey) {
-    return res.json({ success: true, analysis: null, message: 'No Vision API key configured' });
+    return res.json({ success: false, error: 'No Vision API key configured' });
   }
 
   try {
     let endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-    let chosenModel = reqModel || process.env.GROQ_VISION_MODEL || 'qwen/qwen3.8-27b';
+    // Use official Groq multimodal vision model (llama-3.2-11b-vision-preview)
+    let chosenModel = reqModel || process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview';
 
     if (effectiveKey.startsWith('xai-')) {
       endpoint = 'https://api.x.ai/v1/chat/completions';
@@ -225,7 +226,7 @@ app.post('/api/crop-analyze', async (req, res) => {
             content: [
               {
                 type: 'text',
-                text: 'Analyze this crop leaf photo. Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string), severityLevel (number 1-3), symptoms (object with hi, sat, en strings), actions (object with hi, sat, en arrays of 3 action step strings), weatherAlert (object with hi, sat, en strings).'
+                text: 'You are an expert agricultural plant pathologist and entomologist analyzing a crop photo. Carefully inspect the leaf, stem, or fruit for pests, insects, larvae, caterpillars, borers, aphids, whiteflies, fungal spots, blight, yellowing, or disease symptoms. If pests or diseases are present, accurately identify them (e.g. Fall Armyworm, Paddy Stem Borer, Aphids, Early Blight, Sheath Blight, Powdery Mildew). Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string: "High Risk" | "Moderate Risk" | "Low Risk"), severityLevel (number 1-3), symptoms (object with hi, sat, en strings describing the specific pests or damage found), actions (object with hi, sat, en arrays of 3 specific pesticide/treatment step strings), weatherAlert (object with hi, sat, en strings).'
               },
               {
                 type: 'image_url',
@@ -234,7 +235,8 @@ app.post('/api/crop-analyze', async (req, res) => {
             ]
           }
         ],
-        temperature: 0.2
+        temperature: 0.1,
+        max_tokens: 600
       })
     });
 
@@ -247,12 +249,12 @@ app.post('/api/crop-analyze', async (req, res) => {
     } else {
       const errData = await visionRes.json().catch(() => ({}));
       console.warn('[Crop Vision Server] Provider returned HTTP', visionRes.status, errData);
+      return res.status(visionRes.status).json({ success: false, error: errData.error?.message || 'Vision API error' });
     }
   } catch (err) {
-    console.warn('[Crop Vision Server] Vision API call failed, falling back:', err);
+    console.error('[Crop Vision Server] Vision API exception:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
-
-  return res.json({ success: true, analysis: null });
 });
 
 
