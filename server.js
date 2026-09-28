@@ -203,8 +203,8 @@ app.post('/api/crop-analyze', async (req, res) => {
 
   try {
     let endpoint = 'https://api.groq.com/openai/v1/chat/completions';
-    // Use official Groq multimodal vision model (llama-3.2-11b-vision-preview)
-    let chosenModel = reqModel || process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview';
+    // Use user-requested Groq model (qwen/qwen3.8-27b)
+    let chosenModel = reqModel || process.env.GROQ_VISION_MODEL || 'qwen/qwen3.8-27b';
 
     if (effectiveKey.startsWith('xai-')) {
       endpoint = 'https://api.x.ai/v1/chat/completions';

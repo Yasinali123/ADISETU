@@ -137,7 +137,7 @@ export const analyzeCropImage = async (imageSrc, customApiKey = '') => {
     const res = await fetch('/api/crop-analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageSrc, apiKey, model: 'llama-3.2-11b-vision-preview' })
+      body: JSON.stringify({ imageSrc, apiKey, model: 'qwen/qwen3.8-27b' })
     });
     const contentType = res.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
@@ -153,7 +153,7 @@ export const analyzeCropImage = async (imageSrc, customApiKey = '') => {
     console.warn('[Crop Vision API] Server endpoint fetch error:', err);
   }
 
-  // 2. Direct Groq Vision API Call (llama-3.2-11b-vision-preview)
+  // 2. Direct Groq Cloud API Call (qwen/qwen3.8-27b)
   const SYSTEM_GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || ('gsk_' + '7MNLaJ4WwA600fpx25X4WGdyb3FYVeJiebxuTWKv3KXHGG7fmCuw');
   const effectiveKey = apiKey || localStorage.getItem('vision_api_key') || localStorage.getItem('groq_api_key') || SYSTEM_GROQ_KEY;
 
@@ -165,7 +165,7 @@ export const analyzeCropImage = async (imageSrc, customApiKey = '') => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.2-11b-vision-preview',
+        model: 'qwen/qwen3.8-27b',
         messages: [
           {
             role: 'user',
