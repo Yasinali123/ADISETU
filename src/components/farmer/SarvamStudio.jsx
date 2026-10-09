@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { Languages, Volume2, Sparkles, StopCircle, ArrowRightLeft, Copy, Check, Settings } from 'lucide-react';
-
+import { 
+  SANTHALI_STT_MODELS, 
+  DEFAULT_SANTHALI_MODEL, 
+  transcribeSanthaliAudio 
+} from '../../api/santhaliSttApi';
+import { Languages, Volume2, Sparkles, StopCircle, ArrowRightLeft, Copy, Check, Settings, Mic, Disc, Upload, Key } from 'lucide-react';
 
 export const SarvamStudio = () => {
   const { 
@@ -25,6 +29,19 @@ export const SarvamStudio = () => {
   const [copied, setCopied] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
   const [tempApiKey, setTempApiKey] = useState(sarvamApiKey);
+
+  // Santhali Studio STT States
+  const [selectedModel, setSelectedModel] = useState(
+    localStorage.getItem('santhali_stt_model') || DEFAULT_SANTHALI_MODEL
+  );
+  const [hfToken, setHfToken] = useState(localStorage.getItem('hf_api_key') || '');
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [sttTranscript, setSttTranscript] = useState('');
+  const [sttError, setSttError] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+
+  const studioRecorderRef = useRef(null);
+  const studioChunksRef = useRef([]);
 
   const samplePhrases = [
     { label: 'Fertilizer Advice', text: 'Apply 15kg nitrogen urea per acre after evening rain.' },
@@ -52,9 +69,8 @@ export const SarvamStudio = () => {
     setTranslatedText('');
   };
 
-  const handleCopy = () => {
-    const textToCopy = translatedText || sourceText;
-    navigator.clipboard.writeText(textToCopy);
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -62,7 +78,88 @@ export const SarvamStudio = () => {
   const handleSaveConfig = (e) => {
     e.preventDefault();
     setSarvamApiKey(tempApiKey);
+    localStorage.setItem('hf_api_key', hfToken);
+    localStorage.setItem('santhali_stt_model', selectedModel);
     setShowConfig(false);
+  };
+
+  // Record Studio Mic for Santhali Transcription
+  const toggleStudioRecording = async () => {
+    if (isRecording) {
+      if (studioRecorderRef.current && studioRecorderRef.current.state === 'recording') {
+        studioRecorderRef.current.stop();
+        setIsRecording(false);
+      }
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      studioRecorderRef.current = new MediaRecorder(stream);
+      studioChunksRef.current = [];
+
+      studioRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) studioChunksRef.current.push(event.data);
+      };
+
+      studioRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(studioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+
+        setIsTranscribing(true);
+        setSttError('');
+
+        try {
+          const res = await transcribeSanthaliAudio({
+            audioBlob,
+            model: selectedModel,
+            hfApiKey: hfToken
+          });
+          if (res.success && res.text) {
+            setSttTranscript(res.text);
+            setSourceText(res.text); // Also load into translation box
+          }
+        } catch (err) {
+          console.error('[Studio Santhali STT Error]:', err);
+          setSttError(err.message || 'Santhali STT Transcription failed.');
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      studioRecorderRef.current.start();
+      setIsRecording(true);
+      setSttError('');
+    } catch (err) {
+      console.error(err);
+      setSttError('Microphone permission denied or unavailable.');
+    }
+  };
+
+  // File Upload Transcription Handler
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsTranscribing(true);
+    setSttError('');
+
+    try {
+      const res = await transcribeSanthaliAudio({
+        audioBlob: file,
+        model: selectedModel,
+        hfApiKey: hfToken
+      });
+      if (res.success && res.text) {
+        setSttTranscript(res.text);
+        setSourceText(res.text);
+      }
+    } catch (err) {
+      console.error('[Studio File Transcribe Error]:', err);
+      setSttError(err.message || 'Audio file transcription failed.');
+    } finally {
+      setIsTranscribing(false);
+    }
   };
 
   return (
@@ -76,13 +173,13 @@ export const SarvamStudio = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-xl font-black text-forest">Sarvam AI Indian Accent & Translation Studio</h3>
+              <h3 className="text-xl font-black text-forest">Sarvam & Santhali AI Studio</h3>
               <span className="bg-emerald-500/10 text-emerald-700 text-xxs font-black px-2.5 py-0.5 rounded-full uppercase border border-emerald-500/30">
-                Bulbul:v3 & Mayura:v1
+                Bulbul:v3 • Mayura:v1 • Whisper • IndicConformer
               </span>
             </div>
             <p className="text-xs text-charcoal-muted">
-              Translate Indian languages & synthesize hyper-realistic Indian accent voices
+              Translate Indian languages, transcribe Santhali speech models, & synthesize natural voice audio
             </p>
           </div>
         </div>
@@ -92,35 +189,136 @@ export const SarvamStudio = () => {
           className="px-3.5 py-2 rounded-xl bg-paper border border-paper-dark text-xs font-bold text-charcoal hover:text-forest flex items-center gap-1.5 transition-all shadow-sm"
         >
           <Settings className="w-4 h-4" />
-          <span>Sarvam API Key</span>
+          <span>API Keys Config</span>
         </button>
       </div>
 
       {/* Settings Modal */}
       {showConfig && (
-        <form onSubmit={handleSaveConfig} className="bg-forest-dark text-paper p-5 rounded-2xl space-y-3 animate-fadeIn">
+        <form onSubmit={handleSaveConfig} className="bg-forest-dark text-paper p-5 rounded-2xl space-y-4 animate-fadeIn">
           <div className="flex items-center justify-between border-b border-forest-light/40 pb-2">
             <span className="text-xs font-bold text-harvest uppercase tracking-widest flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-harvest" /> Sarvam AI Key Configured
+              <Sparkles className="w-4 h-4 text-harvest" /> API & Model Configuration
             </span>
             <button type="button" onClick={() => setShowConfig(false)} className="text-xs text-paper-muted hover:text-paper">✕</button>
           </div>
-          <div className="space-y-1">
-            <label className="text-xxs uppercase font-bold text-paper-muted">Subscription Key</label>
-            <input
-              type="password"
-              value={tempApiKey}
-              onChange={(e) => setTempApiKey(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-xl bg-forest-light border border-leaf-soft/40 text-paper font-mono text-xs focus:ring-1 focus:ring-harvest outline-none"
-            />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xxs uppercase font-bold text-paper-muted">Sarvam Subscription Key</label>
+              <input
+                type="password"
+                value={tempApiKey}
+                onChange={(e) => setTempApiKey(e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl bg-forest-light border border-leaf-soft/40 text-paper font-mono text-xs focus:ring-1 focus:ring-harvest outline-none"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xxs uppercase font-bold text-paper-muted">Hugging Face API Key (HF_TOKEN)</label>
+              <input
+                type="password"
+                value={hfToken}
+                onChange={(e) => setHfToken(e.target.value)}
+                placeholder="hf_..."
+                className="w-full px-3.5 py-2 rounded-xl bg-forest-light border border-leaf-soft/40 text-paper font-mono text-xs focus:ring-1 focus:ring-harvest outline-none"
+              />
+            </div>
           </div>
+
           <div className="flex justify-end pt-1">
             <button type="submit" className="px-4 py-1.5 rounded-lg bg-harvest text-forest-dark font-black text-xs hover:bg-harvest-amber transition-all">
-              Save Key
+              Save Configuration
             </button>
           </div>
         </form>
       )}
+
+      {/* DEDICATED SANTHALI STT SPEECH-TO-TEXT STUDIO SECTION */}
+      <div className="bg-paper p-5 rounded-3xl border-2 border-harvest/40 space-y-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-paper-dark pb-3">
+          <div className="flex items-center gap-2">
+            <Disc className="w-5 h-5 text-harvest animate-spin-slow" />
+            <div>
+              <h4 className="text-sm font-black text-forest">Santhali Speech-to-Text Model Transcriber</h4>
+              <p className="text-xxs text-charcoal-muted">
+                Transcribe Santhali audio using <span className="font-bold text-forest">thunderboltc/whisper-small-santali-sanlish</span> or <span className="font-bold text-forest">ai4bharat/indicconformer_stt_sat_hybrid_ctc_rnnt_large</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Model Switcher */}
+          <div className="flex bg-paper-dark p-1 rounded-xl">
+            {SANTHALI_STT_MODELS.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => {
+                  setSelectedModel(m.id);
+                  localStorage.setItem('santhali_stt_model', m.id);
+                }}
+                className={`px-3 py-1 rounded-lg text-xxs font-bold transition-all ${
+                  selectedModel === m.id ? 'bg-forest text-paper shadow-sm' : 'text-charcoal-muted hover:text-forest'
+                }`}
+              >
+                {m.name.split(' ')[0]} {m.badge}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Action Controls for Santhali STT */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={toggleStudioRecording}
+              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-md ${
+                isRecording ? 'bg-red-600 text-white animate-pulse' : 'bg-forest text-paper hover:bg-forest-dark'
+              }`}
+            >
+              <Mic className="w-4 h-4" />
+              <span>{isRecording ? 'Stop Recording & Transcribe' : 'Record Santhali Mic Audio'}</span>
+            </button>
+
+            <label className="px-4 py-2 rounded-xl bg-harvest text-forest-dark font-black text-xs hover:bg-harvest-amber transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
+              <Upload className="w-4 h-4" />
+              <span>Upload Audio File</span>
+              <input type="file" accept="audio/*" onChange={handleFileUpload} className="hidden" />
+            </label>
+          </div>
+
+          <div className="text-xxs font-mono text-charcoal-muted bg-paper-card px-3 py-1 rounded-lg border border-paper-dark">
+            Active Model: <span className="text-forest font-bold">{selectedModel}</span>
+          </div>
+        </div>
+
+        {/* Status / Output Display */}
+        {isTranscribing && (
+          <div className="p-3 bg-harvest-pale border border-harvest/30 rounded-xl text-xs font-bold text-forest flex items-center gap-2 animate-pulse">
+            <Sparkles className="w-4 h-4 text-harvest animate-spin" />
+            Transcribing Santhali speech using Hugging Face AI model...
+          </div>
+        )}
+
+        {sttError && (
+          <div className="p-3 bg-amber-500/10 border border-amber-400/40 rounded-xl text-xs font-bold text-amber-800">
+            ⚠ {sttError}
+          </div>
+        )}
+
+        {sttTranscript && (
+          <div className="p-4 bg-forest-dark text-paper rounded-2xl space-y-1 relative">
+            <div className="flex items-center justify-between">
+              <span className="text-xxs uppercase font-bold text-harvest tracking-widest">Santhali AI Transcript</span>
+              <button onClick={() => handleCopy(sttTranscript)} className="text-xxs text-paper-muted hover:text-paper font-bold flex items-center gap-1">
+                <Copy className="w-3 h-3" /> Copy
+              </button>
+            </div>
+            <p className="text-sm font-bold font-mono text-emerald-300 leading-relaxed">
+              "{sttTranscript}"
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Voice Selection Controls */}
       <div className="bg-paper p-4 rounded-2xl border border-paper-dark space-y-3">
@@ -270,7 +468,7 @@ export const SarvamStudio = () => {
                   <span>Speak Translation</span>
                 </button>
                 <button
-                  onClick={handleCopy}
+                  onClick={() => handleCopy(translatedText)}
                   className="p-1.5 rounded-xl bg-paper border border-paper-dark text-forest hover:bg-paper-dark transition-all"
                   title="Copy Translation"
                 >

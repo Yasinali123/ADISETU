@@ -14,68 +14,180 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
 
 
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws-xai' });
 
 const DEFAULT_AGENT_ID = process.env.XAI_AGENT_ID || 'agent_hqm1pHqkbVkCk2dJ';
-const SYSTEM_GROQ_KEY = process.env.GROQ_API_KEY || ('gsk_' + '7MNLaJ4WwA600fpx25X4WGdyb3FYVeJiebxuTWKv3KXHGG7fmCuw');
+const SYSTEM_GROQ_KEY_1 = process.env.GROQ_API_KEY_1 || (process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.split(',')[0].trim() : '');
+const SYSTEM_GROQ_KEY_2 = process.env.GROQ_API_KEY_2 || (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.includes(',') ? process.env.GROQ_API_KEY.split(',')[1].trim() : '');
 const SYSTEM_SARVAM_KEY = process.env.SARVAM_API_KEY || ('sk_' + 'q7qre2sd_skbmTZP7ExF7j4YxeumJT0KT');
 const SYSTEM_GEMINI_KEY = process.env.GEMINI_API_KEY || ('AQ.Ab8RN6Jo-6IQoTe3GFi6o1_' + 'uaykxz1-rFD_FWi3e0rv5BiaPtA');
+const SYSTEM_HF_KEY = process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN || '';
 
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     agentId: DEFAULT_AGENT_ID,
-    hasApiKey: Boolean(process.env.XAI_API_KEY || SYSTEM_GROQ_KEY)
+    hasApiKey: Boolean(process.env.XAI_API_KEY || SYSTEM_GROQ_KEY_1)
   });
 });
 
 app.post(['/api/grok-chat', '/api/groq-chat'], async (req, res) => {
-  const { question, language, apiKey, model } = req.body;
-  const groqKey = apiKey || SYSTEM_GROQ_KEY;
+  const { question, language, apiKey, apiKey2, model } = req.body;
+  
+  // Available Groq API keys for failover
+  const primaryKey = apiKey || SYSTEM_GROQ_KEY_1;
+  const secondaryKey = apiKey2 || SYSTEM_GROQ_KEY_2;
+  const groqKeys = [primaryKey, secondaryKey].filter(Boolean);
+
   const groqModel = model || process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
 
   const systemPrompt = language === 'hi' 
     ? 'आप ADISETU AI हैं, जो झारखंड के किसानों के कृषि सलाहकार हैं। किसान के कृषि प्रश्न का गहरा विश्लेषण करें और सरल, व्यावहारिक, सटीक सलाह 2-3 वाक्यों में दें ताकि इसे आसानी से पढ़कर सुनाया जा सके।'
+    : language === 'sat'
+    ? 'ᱟᱢ ADISETU AI ᱠᱟᱱᱟᱢ, ᱡᱷᱟᱨᱠᱷᱚᱸᱰ ᱨᱮᱱ ᱪᱟᱥᱤ ᱠᱚᱣᱟᱜ ᱪᱟᱥ ᱵᱟᱥᱟ ᱥᱟᱞᱟᱦᱠᱟᱨ᱾ ᱪᱟᱥᱤ ᱭᱟᱜ ᱠᱩᱠᱞᱤ ᱨᱮᱱᱟᱜ ᱥᱟᱹᱨᱤ ᱞᱟᱹᱱᱟᱹᱭ ᱟᱨ ᱥᱚᱞᱦᱮ ᱒-᱓ ᱫᱷᱟᱹᱲ ᱨᱮ ᱮᱢ ᱢᱮ᱾'
     : 'You are ADISETU AI, an expert agricultural AI advisor for farmers in Jharkhand, India. Deeply analyze the farmer question and provide clear, practical, concise farming advice (2-3 sentences max) suitable for text-to-speech voice playback.';
 
-  try {
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${groqKey}`
-      },
-      body: JSON.stringify({
-        model: groqModel,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: question }
-        ],
-        temperature: 0.6,
-        max_tokens: 350
-      })
-    });
+  let lastError = null;
 
-    if (groqRes.ok) {
-      const data = await groqRes.json();
-      const answer = data.choices?.[0]?.message?.content;
-      if (answer) {
-        return res.json({ success: true, answer, source: 'groq-qwen-ai' });
+  for (let i = 0; i < groqKeys.length; i++) {
+    const currentKey = groqKeys[i];
+    try {
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentKey}`
+        },
+        body: JSON.stringify({
+          model: groqModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: question }
+          ],
+          temperature: 0.6,
+          max_tokens: 350
+        })
+      });
+
+      if (groqRes.ok) {
+        const data = await groqRes.json();
+        const answer = data.choices?.[0]?.message?.content;
+        if (answer) {
+          return res.json({ success: true, answer, source: 'groq-qwen-ai', keyIndex: i + 1 });
+        }
       }
+
+      const errData = await groqRes.json().catch(() => ({}));
+      lastError = errData.error?.message || `Groq API returned HTTP ${groqRes.status}`;
+      console.warn(`[Groq AI Key ${i + 1} Warning]: ${lastError}`);
+
+      // If rate limited (429) or quota exceeded, try next key immediately
+      if (groqRes.status === 429 || groqRes.status === 401) {
+        continue;
+      }
+    } catch (err) {
+      console.error(`[Groq AI Key ${i + 1} Exception]:`, err);
+      lastError = err.message;
     }
-
-    const errData = await groqRes.json().catch(() => ({}));
-    console.error('[Groq AI Chat Error]:', errData);
-    return res.status(groqRes.status).json({ success: false, error: errData.error?.message || 'Groq API Error' });
-
-  } catch (err) {
-    console.error('[Groq AI Exception]:', err);
-    return res.status(500).json({ success: false, error: err.message });
   }
+
+  return res.status(500).json({ success: false, error: lastError || 'Groq API Error across available keys' });
+});
+
+// Santhali Speech-to-Text Proxy Endpoint with Automatic Multi-Model Failover
+// Supported models in cascade order:
+// 1. thunderboltc/whisper-small-santali-sanlish
+// 2. ai4bharat/indicconformer_stt_sat_hybrid_ctc_rnnt_large
+const SANTHALI_MODELS = [
+  'thunderboltc/whisper-small-santali-sanlish',
+  'ai4bharat/indicconformer_stt_sat_hybrid_ctc_rnnt_large'
+];
+
+app.post('/api/stt-santhali', async (req, res) => {
+  const { audioBase64, mimeType, model, apiKey } = req.body;
+  const hfKey = apiKey || SYSTEM_HF_KEY;
+
+  if (!audioBase64) {
+    return res.status(400).json({ success: false, error: 'audioBase64 is required' });
+  }
+
+  if (!hfKey) {
+    return res.status(401).json({
+      success: false,
+      needApiKey: true,
+      error: 'Hugging Face API Key (HF_TOKEN) is not configured. Please enter your Hugging Face API key in Voice Settings.'
+    });
+  }
+
+  // Determine model cascade queue
+  let modelQueue = [...SANTHALI_MODELS];
+  if (model && model !== 'auto' && SANTHALI_MODELS.includes(model)) {
+    modelQueue = [model, ...SANTHALI_MODELS.filter(m => m !== model)];
+  }
+
+  const audioBuffer = Buffer.from(audioBase64, 'base64');
+  let lastError = null;
+  let modelLoadingTime = null;
+
+  for (let i = 0; i < modelQueue.length; i++) {
+    const currentModel = modelQueue[i];
+    try {
+      const hfUrl = `https://api-inference.huggingface.co/models/${currentModel}`;
+      const hfRes = await fetch(hfUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${hfKey}`,
+          'Content-Type': mimeType || 'audio/webm'
+        },
+        body: audioBuffer
+      });
+
+      const data = await hfRes.json();
+
+      if (hfRes.ok) {
+        const transcript = Array.isArray(data) ? data[0]?.text : data?.text;
+        if (transcript !== undefined && transcript !== null && transcript.trim() !== '') {
+          return res.json({
+            success: true,
+            text: transcript,
+            model: currentModel,
+            fallbackUsed: i > 0
+          });
+        }
+      }
+
+      if (data && data.error) {
+        if (data.estimated_time) {
+          modelLoadingTime = data.estimated_time;
+          console.warn(`[Santhali STT] Model ${currentModel} is loading (Est: ${data.estimated_time}s). Automatically switching to alternate model...`);
+          continue; // Instantly attempt alternate model!
+        }
+        lastError = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+        console.warn(`[Santhali STT] Model ${currentModel} error:`, lastError);
+      }
+    } catch (err) {
+      console.error(`[Santhali STT] Model ${currentModel} exception:`, err);
+      lastError = err.message;
+    }
+  }
+
+  // If models are loading or unavailable
+  if (modelLoadingTime) {
+    return res.status(503).json({
+      success: false,
+      error: `Santhali AI models are warming up on Hugging Face. Est time: ${Math.round(modelLoadingTime)}s. Please retry in a few seconds.`,
+      estimatedTime: modelLoadingTime
+    });
+  }
+
+  return res.status(500).json({
+    success: false,
+    error: lastError || 'Santhali STT models unavailable. Please try again.'
+  });
 });
 
 

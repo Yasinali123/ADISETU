@@ -4,11 +4,13 @@
  * STRICT LIVE ONLY - No static default fallback answers.
  */
 
-const DEFAULT_GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || ('gsk_' + '7MNLaJ4WwA600fpx25X4WGdyb3FYVeJiebxuTWKv3KXHGG7fmCuw');
+const DEFAULT_GROQ_KEY_1 = import.meta.env.VITE_GROQ_API_KEY_1 || import.meta.env.VITE_GROQ_API_KEY || '';
+const DEFAULT_GROQ_KEY_2 = import.meta.env.VITE_GROQ_API_KEY_2 || '';
 const DEFAULT_MODEL = import.meta.env.VITE_GROQ_MODEL || 'qwen/qwen3.8-27b';
 
 export const askGrokAI = async (question, language = 'hi', customApiKey = '') => {
-  const apiKey = customApiKey || localStorage.getItem('groq_api_key') || localStorage.getItem('xai_api_key') || DEFAULT_GROQ_KEY;
+  const apiKey = customApiKey || localStorage.getItem('groq_api_key') || localStorage.getItem('xai_api_key') || DEFAULT_GROQ_KEY_1;
+  const apiKey2 = localStorage.getItem('groq_api_key_2') || DEFAULT_GROQ_KEY_2;
   const model = localStorage.getItem('groq_model') || DEFAULT_MODEL;
 
   // 1. Try Backend Groq API Proxy Endpoint (/api/grok-chat)
@@ -22,6 +24,7 @@ export const askGrokAI = async (question, language = 'hi', customApiKey = '') =>
         question,
         language,
         apiKey,
+        apiKey2,
         model
       })
     });
@@ -40,46 +43,50 @@ export const askGrokAI = async (question, language = 'hi', customApiKey = '') =>
     console.warn('[Groq AI] Backend API call failed, attempting direct Groq API:', err);
   }
 
-  // 2. Direct Groq Cloud API Call (Client-Side fallback to qwen/qwen3.8-27b)
-  const effectiveKey = apiKey || DEFAULT_GROQ_KEY;
-  if (!effectiveKey) {
+  // 2. Direct Groq Cloud API Call (Client-Side fallback with dual keys)
+  const clientKeys = [apiKey, apiKey2].filter(Boolean);
+  if (clientKeys.length === 0) {
     return 'No Groq API Key configured. Please add your Groq API key to use the live AI advisor.';
   }
 
   const systemPrompt = language === 'hi' 
     ? 'आप ADISETU AI हैं, जो झारखंड के किसानों के कृषि सलाहकार हैं। किसान के कृषि प्रश्न का गहरा विश्लेषण करें और सरल, व्यावहारिक, सटीक सलाह 2-3 वाक्यों में दें ताकि इसे आसानी से पढ़कर सुनाया जा सके।'
     : language === 'sat'
-    ? 'ᱟᱢ ADISETU AI ᱠᱟᱱᱟᱢ, ᱡᱷᱟᱨᱠᱷᱚᱸᱰ ᱨᱮᱱ ᱪᱟᱥᱤ ᱠᱚᱣᱟᱜ ᱪᱟᱥ ᱵᱟᱥᱟ ᱥᱟᱞᱟᱦᱠᱟᱨ᱾ ᱪᱟᱥᱤ ᱭᱟᱜ ᱠᱩᱠᱞᱤ ᱨᱮᱱᱟᱜ ᱥᱟᱹᱨᱤ ᱞᱟᱹᱱᱟᱹᱭ ᱟᱨ ᱥᱚᱞᱦᱮ ᱒-᱓ ᱫᱷᱟᱹᱲ ᱨᱮ ᱮᱢ Mᱮ᱾'
+    ? 'ᱟᱢ ADISETU AI ᱠᱟᱱᱟᱢ, ᱡᱷᱟᱨᱠᱷᱚᱸᱰ ᱨᱮᱱ ᱪᱟᱥᱤ ᱠᱚᱣᱟᱜ ᱪᱟᱥ ᱵᱟᱥᱟ ᱥᱟᱞᱟᱦᱠᱟᱨ᱾ ᱪᱟᱥᱤ ᱭᱟᱜ ᱠᱩᱠᱞᱤ ᱨᱮᱱᱟᱜ ᱥᱟᱹᱨᱤ ᱞᱟᱹᱱᱟᱹᱭ ᱟᱨ ᱥᱚᱞᱦᱮ ᱒-᱓ ᱫᱷᱟᱹᱲ ᱨᱮ ᱮᱢ ᱢᱮ᱾'
     : 'You are ADISETU AI, an expert agricultural AI advisor for farmers in Jharkhand, India. Deeply analyze the farmer question and provide clear, practical, concise farming advice (2-3 sentences max) suitable for text-to-speech voice playback.';
 
-  try {
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${effectiveKey}`
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: question }
-        ],
-        temperature: 0.6,
-        max_tokens: 350
-      })
-    });
+  for (let key of clientKeys) {
+    try {
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: question }
+          ],
+          temperature: 0.6,
+          max_tokens: 350
+        })
+      });
 
-    const data = await groqRes.json();
-    if (groqRes.ok && data.choices?.[0]?.message?.content) {
-      return data.choices[0].message.content;
+      const data = await groqRes.json();
+      if (groqRes.ok && data.choices?.[0]?.message?.content) {
+        return data.choices[0].message.content;
+      }
+      if (groqRes.status === 429 || groqRes.status === 401) {
+        continue;
+      }
+      if (data.error && data.error.message) {
+        return `[AI Error]: ${data.error.message}`;
+      }
+    } catch (err) {
+      console.error('[Groq AI Direct Error]:', err);
     }
-    if (data.error && data.error.message) {
-      return `[AI Error]: ${data.error.message}`;
-    }
-  } catch (err) {
-    console.error('[Groq AI Direct Error]:', err);
-    return `[Network Error]: Unable to connect to Groq AI service (${err.message}).`;
   }
 
   return 'Could not process query with AI model. Please try again.';
