@@ -106,17 +106,30 @@ function xaiVoiceProxyPlugin() {
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const groqKey = env.VITE_GROQ_API_KEY || env.GROQ_API_KEY || process.env.GROQ_API_KEY || ('gsk_' + '7MNLaJ4WwA600fpx25X4WGdyb3FYVeJiebxuTWKv3KXHGG7fmCuw');
-  const sarvamKey = env.VITE_SARVAM_API_KEY || env.SARVAM_API_KEY || process.env.SARVAM_API_KEY || ('sk_' + 'q7qre2sd_skbmTZP7ExF7j4YxeumJT0KT');
+  const groqKey1 = env.GROQ_API_KEY_1 || env.VITE_GROQ_API_KEY_1 || env.GROQ_API_KEY || '';
+  const groqKey2 = env.GROQ_API_KEY_2 || env.VITE_GROQ_API_KEY_2 || '';
+  const sarvamKey = env.SARVAM_API_KEY || env.VITE_SARVAM_API_KEY || 'sk_q7qre2sd_skbmTZP7ExF7j4YxeumJT0KT';
+  const hfKey = env.HUGGINGFACE_API_KEY || env.VITE_HUGGINGFACE_API_KEY || '';
+  const geminiKey = env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY || '';
 
   return {
     plugins: [react(), xaiVoiceProxyPlugin()],
     define: {
-      'import.meta.env.VITE_GROQ_API_KEY': JSON.stringify(groqKey),
-      'import.meta.env.VITE_SARVAM_API_KEY': JSON.stringify(sarvamKey)
+      'import.meta.env.VITE_GROQ_API_KEY': JSON.stringify(groqKey1),
+      'import.meta.env.VITE_GROQ_API_KEY_1': JSON.stringify(groqKey1),
+      'import.meta.env.VITE_GROQ_API_KEY_2': JSON.stringify(groqKey2),
+      'import.meta.env.VITE_SARVAM_API_KEY': JSON.stringify(sarvamKey),
+      'import.meta.env.VITE_HUGGINGFACE_API_KEY': JSON.stringify(hfKey),
+      'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(geminiKey)
     },
     server: {
-      port: 5173
+      port: 5173,
+      proxy: {
+        '/api': {
+          target: 'http://localhost:3001',
+          changeOrigin: true
+        }
+      }
     }
   }
 })

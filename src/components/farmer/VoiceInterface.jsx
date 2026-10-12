@@ -7,7 +7,7 @@ import {
   DEFAULT_SANTHALI_MODEL, 
   transcribeSanthaliAudio 
 } from '../../api/santhaliSttApi';
-import { Mic, Volume2, Sparkles, Send, Settings, AlertCircle, Cpu, Languages, Radio, Key, Disc } from 'lucide-react';
+import { Mic, Volume2, Sparkles, Send, Settings, AlertCircle, Cpu, Languages, Radio, Key, Disc, ArrowRight } from 'lucide-react';
 
 export const VoiceInterface = () => {
   const { 
@@ -49,6 +49,7 @@ export const VoiceInterface = () => {
   const recognitionRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const latestTranscriptRef = useRef('');
 
   // Sample voice queries for quick testing
   const samplePrompts = {
@@ -75,18 +76,26 @@ export const VoiceInterface = () => {
           .map(result => result[0].transcript)
           .join('');
         setTranscript(currentTranscript);
+        latestTranscriptRef.current = currentTranscript;
       };
 
       recognitionRef.current.onerror = (err) => {
         console.warn('[SpeechRecognition] Error:', err.error);
         setIsListening(false);
         if (err.error !== 'no-speech' && lang !== 'sat') {
-          setErrorMessage('Speech recognition issue. Try typing your question or using Santhali AI recording.');
+          setErrorMessage('Speech recognition encountered an issue. Try typing your question or using Santhali AI recording.');
         }
       };
 
       recognitionRef.current.onend = () => {
         setIsListening(false);
+        // Automatically submit voice query when user finishes speaking!
+        const finalQuery = latestTranscriptRef.current?.trim();
+        if (finalQuery) {
+          console.log('[SpeechRecognition] Speech finished, auto-submitting query:', finalQuery);
+          latestTranscriptRef.current = '';
+          processQuery(finalQuery);
+        }
       };
     }
 
@@ -183,13 +192,16 @@ export const VoiceInterface = () => {
       } else if (recognitionRef.current) {
         recognitionRef.current.stop();
         setIsListening(false);
-        if (transcript.trim()) {
-          processQuery(transcript);
+        const queryToProcess = latestTranscriptRef.current?.trim() || transcript.trim();
+        if (queryToProcess) {
+          latestTranscriptRef.current = '';
+          processQuery(queryToProcess);
         }
       }
     } else {
       setTranscript('');
       setAiResponse('');
+      latestTranscriptRef.current = '';
 
       if (lang === 'sat') {
         startSanthaliMicRecording();
@@ -227,7 +239,7 @@ export const VoiceInterface = () => {
     e?.preventDefault();
     if (!textInput.trim()) return;
 
-    const query = textInput;
+    const query = textInput.trim();
     setTextInput('');
     setTranscript(query);
     setAiResponse('');
@@ -246,16 +258,27 @@ export const VoiceInterface = () => {
   };
 
   const processQuery = async (queryText) => {
+    if (!queryText || !queryText.trim()) return;
+    const cleanQuery = queryText.trim();
+
     setIsProcessing(true);
     setErrorMessage('');
+    setAiResponse('');
 
     try {
-      const answer = await askGrokAI(queryText, lang, customKey);
+      console.log('[ADISETU Voice] Submitting question to AI:', cleanQuery);
+      const answer = await askGrokAI(cleanQuery, lang, customKey);
+      console.log('[ADISETU Voice] Received AI Answer:', answer);
+
       setAiResponse(answer);
       setIsProcessing(false);
 
       // Play voice answer out loud
-      playAudioResponse(answer);
+      if (answer && !answer.startsWith('[AI Notice]') && !answer.startsWith('[AI Error]')) {
+        playAudioResponse(answer);
+      } else if (answer.startsWith('[AI Notice]') || answer.startsWith('[AI Error]')) {
+        setErrorMessage(answer);
+      }
     } catch (err) {
       console.error('[Process Query Error]:', err);
       setIsProcessing(false);
@@ -351,7 +374,7 @@ export const VoiceInterface = () => {
               </div>
 
               {/* Santhali Model Selection */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {SANTHALI_STT_MODELS.map((m) => (
                   <label
                     key={m.id}
@@ -369,7 +392,7 @@ export const VoiceInterface = () => {
                       <span className="text-xxs opacity-80 block mt-0.5">{m.description}</span>
                     </div>
                     <span className="text-xxxs uppercase tracking-wider font-mono opacity-70 mt-2">
-                      {m.id}
+                      {m.badge}
                     </span>
                   </label>
                 ))}
@@ -474,7 +497,7 @@ export const VoiceInterface = () => {
                 }`} />
                 <span className="text-xs font-bold uppercase tracking-wider text-paper-muted">
                   {isListening ? (lang === 'sat' ? 'Recording Santhali Audio...' : 'Listening to Mic...') :
-                   isProcessing ? 'Grok AI Thinking...' :
+                   isProcessing ? 'Grok AI Generating Advice...' :
                    isPlayingAudio ? 'Grok AI Speaking Answer...' : 'Grok AI Ready'}
                 </span>
               </div>
@@ -516,7 +539,7 @@ export const VoiceInterface = () => {
                       Santhali Speech-to-Text AI Engine
                     </div>
                     <div className="text-xs font-bold text-paper">
-                      {SANTHALI_STT_MODELS.find(m => m.id === santhaliModel)?.name || 'Whisper Small Santali'}
+                      {SANTHALI_STT_MODELS.find(m => m.id === santhaliModel)?.name || 'Smart Auto-Switch'}
                     </div>
                   </div>
                 </div>
@@ -532,7 +555,7 @@ export const VoiceInterface = () => {
                   >
                     {SANTHALI_STT_MODELS.map(m => (
                       <option key={m.id} value={m.id}>
-                        {m.name} ({m.provider})
+                        {m.name}
                       </option>
                     ))}
                   </select>
@@ -608,9 +631,9 @@ export const VoiceInterface = () => {
             {/* Status Subtext */}
             <p className="text-sm font-semibold text-paper-muted">
               {isListening
-                ? (lang === 'sat' ? 'Recording mic audio for Santhali AI transcription...' : t('voiceListening'))
+                ? (lang === 'sat' ? 'Recording mic audio for Santhali AI transcription...' : 'Listening... Speak your question clearly')
                 : isProcessing
-                ? "Grok AI is generating advice..."
+                ? "Grok AI is generating farming advice..."
                 : isPlayingAudio
                 ? "Playing voice response..."
                 : t('voicePlaceholder')}
@@ -656,19 +679,38 @@ export const VoiceInterface = () => {
           </div>
 
           {/* TRANSCRIPT & GROK AI VOICE ADVICE DISPLAY */}
-          {(transcript || aiResponse) && (
+          {(transcript || aiResponse || isProcessing) && (
             <div className="bg-paper-card rounded-3xl p-6 sm:p-8 border border-paper-dark shadow-soft-natural space-y-4 animate-fadeIn">
               
               {/* Farmer Voice Query */}
               {transcript && (
-                <div className="p-4 rounded-2xl bg-paper border border-paper-dark space-y-1">
-                  <span className="text-xs font-bold text-harvest uppercase tracking-wider flex items-center gap-1.5">
-                    <Mic className="w-3.5 h-3.5" />
-                    Farmer Spoken Input ({lang === 'sat' ? 'Santhali STT Transcribed' : 'Voice Input'})
-                  </span>
+                <div className="p-4 rounded-2xl bg-paper border border-paper-dark space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-harvest uppercase tracking-wider flex items-center gap-1.5">
+                      <Mic className="w-3.5 h-3.5" />
+                      Farmer Spoken Input ({lang === 'sat' ? 'Santhali STT Transcribed' : 'Voice Input'})
+                    </span>
+                    {!aiResponse && !isProcessing && (
+                      <button
+                        onClick={() => processQuery(transcript)}
+                        className="px-3 py-1 rounded-lg bg-forest text-paper text-xs font-bold flex items-center gap-1 hover:bg-forest-dark transition-all"
+                      >
+                        <span>Ask AI</span>
+                        <ArrowRight className="w-3 h-3 text-harvest" />
+                      </button>
+                    )}
+                  </div>
                   <p className="text-base font-bold text-forest italic">
                     "{transcript}"
                   </p>
+                </div>
+              )}
+
+              {/* Processing Loader */}
+              {isProcessing && (
+                <div className="p-4 rounded-2xl bg-harvest-pale border border-harvest/30 text-xs font-bold text-forest flex items-center gap-2.5 animate-pulse">
+                  <Sparkles className="w-4 h-4 text-harvest animate-spin" />
+                  <span>ADISETU AI is analyzing your question & generating advice...</span>
                 </div>
               )}
 

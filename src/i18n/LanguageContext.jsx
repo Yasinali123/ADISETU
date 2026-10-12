@@ -33,10 +33,9 @@ export const LanguageProvider = ({ children }) => {
     const speakLang = targetLangOverride || lang;
     const speakerToUse = customSpeaker || selectedVoice || (speakLang === 'hi' ? 'ritu' : 'simran');
 
-    if (isPlayingAudio) {
-      stopAudio();
-      return;
-    }
+    stopAudio();
+
+    if (!textToSpeak || !textToSpeak.trim()) return;
 
     setAudioText(textToSpeak);
     setIsPlayingAudio(true);
