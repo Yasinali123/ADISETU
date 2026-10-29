@@ -36,7 +36,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.post(['/api/grok-chat', '/api/groq-chat'], async (req, res) => {
-  const { question, language, apiKey, apiKey2, model } = req.body;
+  const { question, language, apiKey, apiKey2, model, history } = req.body;
   
   // Available Groq API keys for failover
   const primaryKey = apiKey || SYSTEM_GROQ_KEY_1;
@@ -46,10 +46,23 @@ app.post(['/api/grok-chat', '/api/groq-chat'], async (req, res) => {
   const groqModel = model || process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
 
   const systemPrompt = language === 'hi' 
-    ? 'आप ADISETU AI हैं, जो झारखंड के किसानों के कृषि सलाहकार हैं। किसान के कृषि प्रश्न का गहरा विश्लेषण करें और सरल, व्यावहारिक, सटीक सलाह 2-3 वाक्यों में दें ताकि इसे आसानी से पढ़कर सुनाया जा सके।'
+    ? 'आप ADISETU AI हैं, जो झारखंड के किसानों के समर्पित कृषि विशेषज्ञ सलाहकार हैं। किसान के हर नए सवाल का विशिष्ट और व्यावहारिक उत्तर 2-3 वाक्यों में दें ताकि इसे आसानी से पढ़कर सुनाया जा सके। कभी भी पुराना या सामान्य उत्तर न दोहराएं।'
     : language === 'sat'
-    ? 'ᱟᱢ ADISETU AI ᱠᱟᱱᱟᱢ, ᱡᱷᱟᱨᱠᱷᱚᱸᱰ ᱨᱮᱱ ᱪᱟᱥᱤ ᱠᱚᱣᱟᱜ ᱪᱟᱥ ᱵᱟᱥᱟ ᱥᱟᱞᱟᱦᱠᱟᱨ᱾ ᱪᱟᱥᱤ ᱭᱟᱜ ᱠᱩᱠᱞᱤ ᱨᱮᱱᱟᱜ ᱥᱟᱹᱨᱤ ᱞᱟᱹᱱᱟᱹᱭ ᱟᱨ ᱥᱚᱞᱦᱮ ᱒-᱓ ᱫᱷᱟᱹᱲ ᱨᱮ ᱮᱢ ᱢᱮ᱾'
-    : 'You are ADISETU AI, an expert agricultural AI advisor for farmers in Jharkhand, India. Deeply analyze the farmer question and provide clear, practical, concise farming advice (2-3 sentences max) suitable for text-to-speech voice playback.';
+    ? 'ᱟᱢ ADISETU AI ᱠᱟᱱᱟᱢ, ᱡᱷᱟᱨᱠᱷᱚᱸᱰ ᱨᱮᱱ ᱪᱟᱥᱤ ᱠᱚᱣᱟᱜ ᱪᱟᱥ ᱵᱟᱥᱟ ᱥᱟᱞᱟᱦᱠᱟᱨ᱾ ᱪᱟᱥᱤ ᱭᱟᱜ ᱱᱟᱣᱟ ᱠᱩᱠᱞᱤ ᱞᱟᱹᱜᱤᱫ ᱥᱟᱹᱨᱤ ᱟᱨ ᱵᱷᱮᱜᱟᱨ ᱞᱟᱹᱱᱟᱹᱭ ᱒-᱓ ᱫᱷᱟᱹᱲ ᱨᱮ ᱮᱢ ᱢᱮ᱾'
+    : 'You are ADISETU AI, an expert agricultural AI advisor for farmers in Jharkhand, India. Analyze the farmer\'s current question in conversation context and provide fresh, practical, concise farming advice (2-3 sentences max) suitable for text-to-speech voice playback. Do not repeat previous answers.';
+
+  const formattedHistory = Array.isArray(history)
+    ? history.slice(-6).map(item => ({
+        role: item.role === 'user' ? 'user' : 'assistant',
+        content: String(item.content || '')
+      })).filter(m => m.content.trim())
+    : [];
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...formattedHistory,
+    { role: 'user', content: question }
+  ];
 
   let lastError = null;
 
@@ -64,11 +77,8 @@ app.post(['/api/grok-chat', '/api/groq-chat'], async (req, res) => {
         },
         body: JSON.stringify({
           model: groqModel,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: question }
-          ],
-          temperature: 0.6,
+          messages: messages,
+          temperature: 0.7,
           max_tokens: 350
         })
       });
@@ -77,7 +87,7 @@ app.post(['/api/grok-chat', '/api/groq-chat'], async (req, res) => {
         const data = await groqRes.json();
         const answer = data.choices?.[0]?.message?.content;
         if (answer) {
-          return res.json({ success: true, answer, source: 'groq-qwen-ai', keyIndex: i + 1 });
+          return res.json({ success: true, answer: answer.trim(), source: 'groq-qwen-ai', keyIndex: i + 1 });
         }
       }
 

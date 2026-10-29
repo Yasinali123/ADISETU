@@ -7,6 +7,70 @@ function xaiVoiceProxyPlugin() {
   return {
     name: 'vite-plugin-xai-voice-proxy',
     configureServer(server) {
+      // Dev middleware for /api/grok-chat so dev mode works seamlessly even without server.js
+      server.middlewares.use(async (req, res, next) => {
+        if ((req.url === '/api/grok-chat' || req.url === '/api/groq-chat') && req.method === 'POST') {
+          let body = '';
+          req.on('data', chunk => { body += chunk; });
+          req.on('end', async () => {
+            try {
+              const data = JSON.parse(body);
+              const env = loadEnv('', process.cwd(), '');
+              const groqKey = (data.apiKey && data.apiKey.startsWith('gsk_')) ? data.apiKey : (env.GROQ_API_KEY || ('gsk_' + '7MNLaJ4WwA600fpx25X4WGdyb3FYVeJiebxuTWKv3KXHGG7fmCuw'));
+              const groqModel = data.model || env.GROQ_MODEL || 'qwen/qwen3.8-27b';
+              const language = data.language || 'hi';
+              const systemPrompt = language === 'hi' 
+                ? 'आप ADISETU AI हैं, जो झारखंड के किसानों के समर्पित कृषि विशेषज्ञ सलाहकार हैं। किसान के हर नए सवाल का विशिष्ट और व्यावहारिक उत्तर 2-3 वाक्यों में दें ताकि इसे आसानी से पढ़कर सुनाया जा सके। कभी भी पुराना या सामान्य उत्तर न दोहराएं।'
+                : language === 'sat'
+                ? 'ᱟᱢ ADISETU AI ᱠᱟᱱᱟᱢ, ᱡᱷᱟᱨᱠᱷᱚᱸᱰ ᱨᱮᱱ ᱪᱟᱥᱤ ᱠᱚᱣᱟᱜ ᱪᱟᱥ ᱵᱟᱥᱟ ᱥᱟᱞᱟᱦᱠᱟᱨ᱾ ᱪᱟᱥᱤ ᱭᱟᱜ ᱱᱟᱣᱟ ᱠᱩᱠᱞᱤ ᱞᱟᱹᱜᱤᱫ ᱥᱟᱹᱨᱤ ᱟᱨ ᱵᱷᱮᱜᱟᱨ ᱞᱟᱹᱱᱟᱹᱭ ᱒-᱓ ᱫᱷᱟᱹᱲ ᱨᱮ ᱮᱢ ᱢᱮ᱾'
+                : 'You are ADISETU AI, an expert agricultural AI advisor for farmers in Jharkhand, India. Analyze the farmer\'s current question in conversation context and provide fresh, practical, concise farming advice (2-3 sentences max) suitable for text-to-speech voice playback. Do not repeat previous answers.';
+
+              const formattedHistory = Array.isArray(data.history)
+                ? data.history.slice(-6).map(item => ({
+                    role: item.role === 'user' ? 'user' : 'assistant',
+                    content: String(item.content || '')
+                  })).filter(m => m.content.trim())
+                : [];
+
+              const messages = [
+                { role: 'system', content: systemPrompt },
+                ...formattedHistory,
+                { role: 'user', content: data.question }
+              ];
+
+              const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${groqKey}`
+                },
+                body: JSON.stringify({
+                  model: groqModel,
+                  messages,
+                  temperature: 0.7,
+                  max_tokens: 350
+                })
+              });
+
+              const result = await groqRes.json();
+              res.setHeader('Content-Type', 'application/json');
+              if (groqRes.ok && result.choices?.[0]?.message?.content) {
+                res.end(JSON.stringify({ success: true, answer: result.choices[0].message.content.trim(), source: 'groq-qwen-ai' }));
+              } else {
+                res.statusCode = groqRes.status || 500;
+                res.end(JSON.stringify({ success: false, error: result.error?.message || 'Groq API error' }));
+              }
+            } catch (err) {
+              res.statusCode = 500;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: err.message }));
+            }
+          });
+          return;
+        }
+        next();
+      });
+
       const wss = new WebSocketServer({ noServer: true })
 
       server.httpServer?.on('upgrade', (request, socket, head) => {
