@@ -4,17 +4,11 @@
     android:layout_height="match_parent"
     android:background="@color/paper">
 
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipe_refresh"
+    <android.webkit.WebView
+        android:id="@+id/webview"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-        <android.webkit.WebView
-            android:id="@+id/webview"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+        android:layout_height="match_parent"
+        android:scrollbars="vertical" />
 
     <!-- Offline View -->
     <LinearLayout

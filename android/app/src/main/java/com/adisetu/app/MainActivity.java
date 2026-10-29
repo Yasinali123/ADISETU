@@ -41,7 +41,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.button.MaterialButton;
 
@@ -61,7 +60,6 @@ public class MainActivity extends AppCompatActivity {
     private static final int LOCATION_PERMISSION_REQUEST = 1003;
 
     private WebView webView;
-    private SwipeRefreshLayout swipeRefresh;
     private LinearLayout offlineView;
     private ProgressBar progressBar;
     private MaterialButton btnRetry;
@@ -77,13 +75,11 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         webView = findViewById(R.id.webview);
-        swipeRefresh = findViewById(R.id.swipe_refresh);
         offlineView = findViewById(R.id.offline_view);
         progressBar = findViewById(R.id.progress_bar);
         btnRetry = findViewById(R.id.btn_retry);
 
         setupWebView();
-        setupSwipeRefresh();
         setupRetryButton();
         registerNetworkCallback();
         checkForUpdates();
@@ -113,6 +109,14 @@ public class MainActivity extends AppCompatActivity {
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
 
+        // Hardware accelerated touch & scrolling
+        webView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
+        webView.setVerticalScrollBarEnabled(true);
+        webView.setHorizontalScrollBarEnabled(false);
+        webView.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        webView.setFocusable(true);
+        webView.setFocusableInTouchMode(true);
+
         // Enable cookies
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
@@ -120,23 +124,6 @@ public class MainActivity extends AppCompatActivity {
 
         webView.setWebViewClient(new AdisetuWebViewClient());
         webView.setWebChromeClient(new AdisetuChromeClient());
-        webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-    }
-
-    private void setupSwipeRefresh() {
-        swipeRefresh.setColorSchemeColors(
-            ContextCompat.getColor(this, R.color.harvest),
-            ContextCompat.getColor(this, R.color.forest),
-            ContextCompat.getColor(this, R.color.leaf)
-        );
-        swipeRefresh.setOnRefreshListener(() -> {
-            if (isNetworkAvailable()) {
-                webView.reload();
-            } else {
-                swipeRefresh.setRefreshing(false);
-                showOfflineView();
-            }
-        });
     }
 
     private void setupRetryButton() {
@@ -392,10 +379,9 @@ public class MainActivity extends AppCompatActivity {
         public void onPageFinished(WebView view, String url) {
             super.onPageFinished(view, url);
             progressBar.setVisibility(View.GONE);
-            swipeRefresh.setRefreshing(false);
 
-            // Inject CSS to hide any browser-specific elements and optimize for mobile
-            String css = "body { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }";
+            // Ensure smooth touch scrolling across all components
+            String css = "html, body { -webkit-overflow-scrolling: touch !important; touch-action: pan-x pan-y !important; }";
             view.evaluateJavascript(
                 "(function() { var s = document.createElement('style'); s.textContent = '" + css + "'; document.head.appendChild(s); })()", null
             );
