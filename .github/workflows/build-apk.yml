@@ -1,0 +1,119 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a GitHub Release with APK'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      version_name:
+        description: 'Version name (e.g., 1.0.1) - only for releases'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for Gradle wrapper
+        run: |
+          chmod +x android/gradlew
+
+      - name: Build Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Build Release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Rename APK files
+        run: |
+          VERSION=$(grep "versionName" android/app/build.gradle | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          mkdir -p artifacts
+
+          if [ -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/ADISETU-v${VERSION}-debug.apk
+          fi
+
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk artifacts/ADISETU-v${VERSION}-release.apk
+          elif [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release-unsigned.apk artifacts/ADISETU-v${VERSION}-release.apk
+          fi
+
+          ls -la artifacts/
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ADISETU-Debug-APK
+          path: artifacts/*debug*.apk
+          retention-days: 30
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ADISETU-Release-APK
+          path: artifacts/*release*.apk
+          retention-days: 90
+
+      - name: Create GitHub Release
+        if: github.event.inputs.create_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.event.inputs.version_name || '1.0.0' }}
+          name: "ADISETU Android v${{ github.event.inputs.version_name || '1.0.0' }}"
+          body: |
+            ## ADISETU Android App v${{ github.event.inputs.version_name || '1.0.0' }}
+
+            🌾 **Bridging Tribal Wisdom & Modern AI**
+
+            ### What's included:
+            - Full ADISETU web app wrapped as native Android
+            - Camera & file upload support for Crop Scanner
+            - Location access for weather features
+            - Voice input support for AI Assistant
+            - Offline detection with auto-reconnect
+            - OTA auto-update from GitHub Releases
+
+            ### Installation:
+            1. Download the APK below
+            2. Enable "Install from unknown sources" if prompted
+            3. Install and open ADISETU
+
+            ---
+            *Built automatically by GitHub Actions*
+          files: artifacts/*.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

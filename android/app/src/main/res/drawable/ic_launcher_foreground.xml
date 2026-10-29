@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Letter A for ADISETU -->
+    <path
+        android:fillColor="#D4A843"
+        android:pathData="M54,28 L38,80 L44,80 L47.5,68 L60.5,68 L64,80 L70,80 L54,28Z M49,63 L54,40 L59,63Z" />
+
+    <!-- Small leaf accent -->
+    <path
+        android:fillColor="#4A8C6F"
+        android:pathData="M54,22 Q58,18 62,22 Q58,26 54,22Z" />
+</vector>

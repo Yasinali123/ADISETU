@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="forest">#1B3A2D</color>
+    <color name="forest_dark">#0F2419</color>
+    <color name="forest_light">#2D5A45</color>
+    <color name="harvest">#D4A843</color>
+    <color name="harvest_amber">#E8C15E</color>
+    <color name="leaf">#4A8C6F</color>
+    <color name="paper">#FAF7F2</color>
+    <color name="paper_card">#FFFFFF</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="status_bar">#0F2419</color>
+    <color name="splash_bg">#1B3A2D</color>
+</resources>
