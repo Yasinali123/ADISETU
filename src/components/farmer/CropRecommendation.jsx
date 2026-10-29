@@ -8,14 +8,36 @@ export const CropRecommendation = () => {
   const { t } = useLanguage();
 
   const [step, setStep] = useState(1);
-  const [district, setDistrict] = useState('Khunti');
-  const [landSize, setLandSize] = useState('2.5 Acres');
-  const [water, setWater] = useState('Monsoon rainfed');
-  const [soil, setSoil] = useState('Red Clay (Tanr)');
-  const [season, setSeason] = useState('Kharif (Monsoon)');
+  const [district, setDistrict] = useState('');
+  const [landSize, setLandSize] = useState('');
+  const [water, setWater] = useState('');
+  const [soil, setSoil] = useState('');
+  const [season, setSeason] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState(null);
+  const [validationError, setValidationError] = useState('');
+
+  // Check if the current step has a selection
+  const isCurrentStepSelected = () => {
+    switch (step) {
+      case 1: return district !== '';
+      case 2: return landSize !== '';
+      case 3: return water !== '';
+      case 4: return soil !== '';
+      case 5: return season !== '';
+      default: return true;
+    }
+  };
+
+  const handleNextStep = () => {
+    if (!isCurrentStepSelected()) {
+      setValidationError('Please select an option before proceeding.');
+      return;
+    }
+    setValidationError('');
+    setStep(step + 1);
+  };
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -58,13 +80,19 @@ export const CropRecommendation = () => {
             {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="flex items-center gap-2">
                 <div 
-                  onClick={() => setStep(i)}
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black cursor-pointer transition-all ${
+                  onClick={() => {
+                    // Only allow going back to already-completed steps
+                    if (i < step) {
+                      setValidationError('');
+                      setStep(i);
+                    }
+                  }}
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black transition-all ${
                     step === i
                       ? 'bg-forest text-harvest-amber ring-4 ring-forest/20 shadow-md'
                       : step > i
-                      ? 'bg-leaf text-paper'
-                      : 'bg-paper-muted text-charcoal-muted'
+                      ? 'bg-leaf text-paper cursor-pointer'
+                      : 'bg-paper-muted text-charcoal-muted cursor-not-allowed opacity-60'
                   }`}
                 >
                   {step > i ? <CheckCircle2 className="w-5 h-5" /> : i}
@@ -91,7 +119,7 @@ export const CropRecommendation = () => {
                 {t('districtOptions').map((d) => (
                   <button
                     key={d}
-                    onClick={() => setDistrict(d)}
+                    onClick={() => { setDistrict(d); setValidationError(''); }}
                     className={`p-3.5 rounded-2xl border text-sm font-bold text-left transition-all ${
                       district === d
                         ? 'bg-forest text-paper border-forest shadow-md'
@@ -117,7 +145,7 @@ export const CropRecommendation = () => {
                 {["1 Acre", "2.5 Acres", "5 Acres", "10+ Acres"].map((sz) => (
                   <button
                     key={sz}
-                    onClick={() => setLandSize(sz)}
+                    onClick={() => { setLandSize(sz); setValidationError(''); }}
                     className={`p-4 rounded-2xl border text-sm font-bold transition-all ${
                       landSize === sz
                         ? 'bg-forest text-paper border-forest shadow-md'
@@ -146,7 +174,7 @@ export const CropRecommendation = () => {
                 {t('waterOptions').map((w) => (
                   <button
                     key={w}
-                    onClick={() => setWater(w)}
+                    onClick={() => { setWater(w); setValidationError(''); }}
                     className={`p-4 rounded-2xl border text-sm font-bold text-left transition-all ${
                       water === w
                         ? 'bg-forest text-paper border-forest shadow-md'
@@ -175,7 +203,7 @@ export const CropRecommendation = () => {
                 {t('soilOptions').map((s) => (
                   <button
                     key={s}
-                    onClick={() => setSoil(s)}
+                    onClick={() => { setSoil(s); setValidationError(''); }}
                     className={`p-4 rounded-2xl border text-sm font-bold text-left transition-all ${
                       soil === s
                         ? 'bg-forest text-paper border-forest shadow-md'
@@ -204,7 +232,7 @@ export const CropRecommendation = () => {
                 {t('seasonOptions').map((sn) => (
                   <button
                     key={sn}
-                    onClick={() => setSeason(sn)}
+                    onClick={() => { setSeason(sn); setValidationError(''); }}
                     className={`p-4 rounded-2xl border text-sm font-bold text-center transition-all ${
                       season === sn
                         ? 'bg-forest text-paper border-forest shadow-md'
@@ -218,11 +246,18 @@ export const CropRecommendation = () => {
             </div>
           )}
 
+          {/* Validation Error */}
+          {validationError && (
+            <div className="text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-center animate-fadeIn">
+              ⚠️ {validationError}
+            </div>
+          )}
+
           {/* Navigation Controls */}
           <div className="flex items-center justify-between pt-6 border-t border-paper-muted">
             {step > 1 ? (
               <button
-                onClick={() => setStep(step - 1)}
+                onClick={() => { setValidationError(''); setStep(step - 1); }}
                 className="px-5 py-2.5 rounded-xl bg-paper border border-paper-dark text-forest font-bold text-sm"
               >
                 Back
@@ -231,16 +266,27 @@ export const CropRecommendation = () => {
 
             {step < 5 ? (
               <button
-                onClick={() => setStep(step + 1)}
-                className="px-6 py-2.5 rounded-xl bg-forest text-paper font-bold text-sm flex items-center gap-2 hover:bg-forest-light shadow-md"
+                onClick={handleNextStep}
+                disabled={!isCurrentStepSelected()}
+                className={`px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-md transition-all ${
+                  isCurrentStepSelected()
+                    ? 'bg-forest text-paper hover:bg-forest-light'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
               >
                 <span>Next Step</span>
                 <ChevronRight className="w-4 h-4 text-harvest" />
               </button>
             ) : (
               <button
-                onClick={handleGenerate}
-                disabled={loading}
+                onClick={() => {
+                  if (!isCurrentStepSelected()) {
+                    setValidationError('Please select an option before proceeding.');
+                    return;
+                  }
+                  handleGenerate();
+                }}
+                disabled={loading || !isCurrentStepSelected()}
                 className="px-8 py-3.5 rounded-2xl bg-harvest hover:bg-harvest-amber text-forest-dark font-black text-sm shadow-glow-harvest flex items-center gap-2 transition-all hover:scale-105"
               >
                 {loading ? (
@@ -275,6 +321,12 @@ export const CropRecommendation = () => {
               onClick={() => {
                 setRecommendations(null);
                 setStep(1);
+                setDistrict('');
+                setLandSize('');
+                setWater('');
+                setSoil('');
+                setSeason('');
+                setValidationError('');
               }}
               className="px-4 py-2 rounded-xl bg-paper border border-paper-dark text-xs font-bold text-forest hover:bg-paper-muted"
             >
