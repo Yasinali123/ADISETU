@@ -48,3 +48,4 @@ The repository includes a GitHub Actions workflow: [`.github/workflows/build-apk
 - **Minimum SDK**: 24 (Android 7.0 Nougat) — covers 96%+ of active Android devices
 - **Target SDK**: 34 (Android 14)
 - **Architecture**: Single Activity WebView Architecture + Native Android Download/Update Engine
+
