@@ -1,56 +1,87 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { analyzeCropImage } from '../../api/cropApi';
-import { Camera, Upload, Mic, RefreshCw, Volume2, ShieldCheck, AlertTriangle, CheckCircle, Info, CloudRain, Sparkles, Settings, Key, Cpu } from 'lucide-react';
+import { 
+  Camera, 
+  Upload, 
+  Mic, 
+  RefreshCw, 
+  Volume2, 
+  ShieldCheck, 
+  AlertTriangle, 
+  CheckCircle, 
+  Info, 
+  CloudRain, 
+  Sparkles, 
+  Settings, 
+  Key, 
+  Cpu,
+  FileText,
+  Copy,
+  Check,
+  Scan
+} from 'lucide-react';
 
 export const CropScanner = ({ onVoiceClick }) => {
   const { lang, t, playAudioResponse, isPlayingAudio, stopAudio } = useLanguage();
   
-  const [selectedImage, setSelectedImage] = useState(
-    "https://images.unsplash.com/photo-1592417817098-8f3d6ef23a28?auto=format&fit=crop&w=800&q=80" // Tomato leaf blight sample
-  );
-  const [isScanning, setIsScanning] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const [visionApiKey, setVisionApiKey] = useState(localStorage.getItem('vision_api_key') || '');
-  const [tempApiKey, setTempApiKey] = useState(visionApiKey);
-  const [scanError, setScanError] = useState(null);
-
-  // Preset leaf sample photos for immediate farmer demo testing
+  // Working agricultural sample photos (Leaves, crops, and packaging with OCR labels)
   const sampleLeaves = [
     {
       id: 1,
       label: "Tomato Early Blight",
-      url: "https://images.unsplash.com/photo-1592417817098-8f3d6ef23a28?auto=format&fit=crop&w=800&q=80"
+      category: "crop_disease",
+      url: "https://images.unsplash.com/photo-1599423300746-b62533397364?auto=format&fit=crop&w=800&q=80"
     },
     {
       id: 2,
       label: "Paddy Sheath Blight",
+      category: "crop_disease",
       url: "https://images.unsplash.com/photo-1530507629858-e4977d30e9e0?auto=format&fit=crop&w=800&q=80"
     },
     {
       id: 3,
       label: "Healthy Crop Leaf",
+      category: "healthy_crop",
       url: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=800&q=80"
+    },
+    {
+      id: 4,
+      label: "Fertilizer / Label (OCR)",
+      category: "fertilizer_ocr",
+      url: "https://images.unsplash.com/photo-1628352081506-83c43123ed6d?auto=format&fit=crop&w=800&q=80"
     }
   ];
+
+  const [selectedImage, setSelectedImage] = useState(sampleLeaves[0].url);
+  const [isScanning, setIsScanning] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [geminiApiKey, setGeminiApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
+  const [tempApiKey, setTempApiKey] = useState(geminiApiKey);
+  const [scanError, setScanError] = useState(null);
+  const [copiedText, setCopiedText] = useState(false);
 
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setSelectedImage(url);
-      runAnalysis(url);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64Url = event.target.result;
+        setSelectedImage(base64Url);
+        runAnalysis(base64Url);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleSaveSettings = (e) => {
     e.preventDefault();
-    setVisionApiKey(tempApiKey);
+    setGeminiApiKey(tempApiKey);
     if (tempApiKey) {
-      localStorage.setItem('vision_api_key', tempApiKey);
+      localStorage.setItem('gemini_api_key', tempApiKey);
     } else {
-      localStorage.removeItem('vision_api_key');
+      localStorage.removeItem('gemini_api_key');
     }
     setShowSettings(false);
     if (selectedImage) runAnalysis(selectedImage);
@@ -63,21 +94,29 @@ export const CropScanner = ({ onVoiceClick }) => {
     stopAudio();
 
     try {
-      const result = await analyzeCropImage(imgUrl, visionApiKey);
+      const result = await analyzeCropImage(imgUrl, geminiApiKey);
       setAnalysisResult(result);
     } catch (err) {
       console.error(err);
-      setScanError(err.message || 'Vision AI analysis failed');
+      setScanError(err.message || 'Vision AI & OCR analysis failed. Please try a clearer photo.');
     } finally {
       setIsScanning(false);
     }
   };
 
+  const handleCopyOcrText = () => {
+    if (analysisResult?.detectedText) {
+      navigator.clipboard.writeText(analysisResult.detectedText);
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2000);
+    }
+  };
+
   const handleAudioPlayback = (audioLang) => {
     if (!analysisResult) return;
-    const textToSpeak = audioLang === 'sat'
-      ? analysisResult.actions.sat.join(" ")
-      : analysisResult.actions.hi.join(" ");
+    const title = analysisResult.localNames?.[audioLang] || analysisResult.name;
+    const actions = (analysisResult.actions?.[audioLang] || analysisResult.actions?.en || []).join(". ");
+    const textToSpeak = `${title}. ${actions}`;
 
     playAudioResponse(textToSpeak);
   };
@@ -88,15 +127,15 @@ export const CropScanner = ({ onVoiceClick }) => {
       {/* Header */}
       <div className="text-center space-y-2 relative">
         <div className="flex items-center justify-center gap-2">
-          <span className="text-xs font-black uppercase tracking-widest text-harvest bg-harvest-pale px-3 py-1 rounded-full flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" />
-            AI Computer Vision Scanner
+          <span className="text-xs font-black uppercase tracking-widest text-harvest bg-harvest-pale px-3.5 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
+            <Scan className="w-3.5 h-3.5 text-harvest" />
+            AI Computer Vision & Agricultural OCR Engine
           </span>
 
           <button
             onClick={() => setShowSettings(!showSettings)}
             className="p-1.5 rounded-full bg-paper border border-paper-dark text-charcoal hover:text-forest transition-all"
-            title="Configure Vision API Key (OpenAI / Vision AI)"
+            title="Configure Gemini Vision & OCR API Key"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -106,17 +145,17 @@ export const CropScanner = ({ onVoiceClick }) => {
           {t('scannerTitle')}
         </h2>
         <p className="text-sm sm:text-base text-charcoal-muted max-w-2xl mx-auto">
-          {t('scannerSub')}
+          Scan crop leaves for diseases and pests, or photograph fertilizer bags and pesticide labels for instant OCR text recognition and dosage instructions.
         </p>
       </div>
 
-      {/* Vision API Key Modal Settings */}
+      {/* Vision & OCR API Key Settings */}
       {showSettings && (
         <form onSubmit={handleSaveSettings} className="bg-paper-card border-2 border-forest-light rounded-3xl p-6 shadow-xl space-y-4 animate-fadeIn">
           <div className="flex items-center justify-between border-b border-paper-dark pb-3">
             <h3 className="text-base font-bold text-forest flex items-center gap-2">
               <Cpu className="w-5 h-5 text-harvest" />
-              Vision AI Model & API Key Settings
+              Gemini Vision & OCR Engine Settings
             </h3>
             <button type="button" onClick={() => setShowSettings(false)} className="text-xs font-bold text-charcoal-muted hover:text-forest">
               ✕ Close
@@ -126,17 +165,17 @@ export const CropScanner = ({ onVoiceClick }) => {
           <div className="space-y-1">
             <label className="text-xs font-bold text-forest uppercase flex items-center gap-1.5">
               <Key className="w-3.5 h-3.5 text-harvest" />
-              Vision AI API Key (Groq `gsk-...`, OpenAI `sk-...`, or xAI `xai-...`)
+              Google Gemini Vision API Key (Gemini 3.5 Flash / 3.1 Flash Lite)
             </label>
             <input
               type="password"
               value={tempApiKey}
               onChange={(e) => setTempApiKey(e.target.value)}
-              placeholder="gsk_7MNLaJ4... or sk-..."
+              placeholder="AQ.Ab8RN6Jo-6IQoTe3GFi6o1_..."
               className="w-full px-4 py-2.5 rounded-xl border border-paper-dark bg-paper text-sm font-mono text-forest focus:ring-2 focus:ring-forest outline-none"
             />
             <p className="text-xxs text-emerald-700 font-bold">
-              ✓ Configured with Groq Vision Engine (`gsk_7MN...`) for real-time plant disease classification.
+              ✓ Pre-configured with system Gemini Vision engine. Leave blank to use system key.
             </p>
           </div>
 
@@ -148,27 +187,26 @@ export const CropScanner = ({ onVoiceClick }) => {
         </form>
       )}
 
-
       {/* Main Upload / Camera & Analysis Area */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
-        {/* Left Side: Photo Capture & Scanning Beam */}
+        {/* Left Side: Photo Capture & Scanning Reticle */}
         <div className="lg:col-span-5 space-y-4">
           
           <div className="relative rounded-3xl overflow-hidden bg-forest-dark border-4 border-paper-card shadow-elevated-farm group">
             <img 
               src={selectedImage} 
-              alt="Crop Leaf Analysis Target"
+              alt="Agricultural Target"
               className="w-full h-80 sm:h-96 object-cover"
             />
 
             {/* Scanning Laser Beam Effect when analyzing */}
             {isScanning && (
-              <div className="absolute inset-0 bg-forest/40 backdrop-blur-xs flex flex-col items-center justify-center space-y-4">
+              <div className="absolute inset-0 bg-forest/50 backdrop-blur-xs flex flex-col items-center justify-center space-y-4">
                 <div className="absolute top-0 left-0 right-0 h-1.5 scanner-line animate-scan-line" />
                 <RefreshCw className="w-10 h-10 text-harvest-amber animate-spin" />
                 <p className="text-xs font-bold text-paper px-6 text-center">
-                  {t('scanSimulating')}
+                  Analyzing leaf pathology & reading packaging OCR text...
                 </p>
               </div>
             )}
@@ -177,7 +215,7 @@ export const CropScanner = ({ onVoiceClick }) => {
             {!isScanning && (
               <div className="absolute inset-6 border-2 border-dashed border-harvest/60 rounded-2xl pointer-events-none flex items-center justify-center">
                 <span className="text-[11px] font-black uppercase tracking-wider text-harvest bg-forest-dark/80 px-2.5 py-1 rounded-lg">
-                  Visual Target Reticle
+                  AI Target Area
                 </span>
               </div>
             )}
@@ -185,13 +223,13 @@ export const CropScanner = ({ onVoiceClick }) => {
 
           {/* Trigger Action Buttons */}
           <div className="grid grid-cols-2 gap-3">
-            <label className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-forest hover:bg-forest-light text-paper font-bold text-xs cursor-pointer shadow-md transition-all">
+            <label className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-forest hover:bg-forest-light text-paper font-bold text-xs cursor-pointer shadow-md transition-all active:scale-95">
               <Camera className="w-4 h-4 text-harvest-amber" />
               <span>{t('btnTakePhoto')}</span>
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileUpload} />
             </label>
 
-            <label className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-paper-card border border-paper-dark hover:border-forest text-forest font-bold text-xs cursor-pointer shadow-md transition-all">
+            <label className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-paper-card border border-paper-dark hover:border-forest text-forest font-bold text-xs cursor-pointer shadow-md transition-all active:scale-95">
               <Upload className="w-4 h-4 text-leaf" />
               <span>{t('btnUploadPhoto')}</span>
               <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
@@ -210,9 +248,9 @@ export const CropScanner = ({ onVoiceClick }) => {
           {/* Sample Preset Selector */}
           <div className="space-y-2 pt-2">
             <p className="text-[11px] font-bold text-charcoal-muted uppercase">
-              Or Select Demo Leaf Sample:
+              Or Select Demo Agricultural Photo:
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-2 gap-2">
               {sampleLeaves.map((item) => (
                 <button
                   key={item.id}
@@ -220,9 +258,9 @@ export const CropScanner = ({ onVoiceClick }) => {
                     setSelectedImage(item.url);
                     runAnalysis(item.url);
                   }}
-                  className={`p-2.5 sm:p-1.5 rounded-xl border text-xs font-bold transition-all text-center ${
+                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-center ${
                     selectedImage === item.url
-                      ? 'border-harvest bg-harvest-pale text-forest'
+                      ? 'border-harvest bg-harvest-pale text-forest shadow-xs'
                       : 'border-paper-dark bg-paper-card text-charcoal-muted hover:border-leaf'
                   }`}
                 >
@@ -243,7 +281,7 @@ export const CropScanner = ({ onVoiceClick }) => {
               <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
                 <AlertTriangle className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-rose-900">Vision Analysis Error</h3>
+              <h3 className="text-base font-bold text-rose-900">Analysis Error</h3>
               <p className="text-xs text-rose-700 font-medium max-w-md mx-auto">
                 {scanError}
               </p>
@@ -255,14 +293,16 @@ export const CropScanner = ({ onVoiceClick }) => {
               </button>
             </div>
           )}
-          {!analysisResult && !isScanning && (
+
+          {/* Empty State Card */}
+          {!analysisResult && !isScanning && !scanError && (
             <div className="bg-paper-card rounded-3xl p-8 border border-paper-dark text-center space-y-4 shadow-soft-natural">
               <div className="w-16 h-16 rounded-2xl bg-harvest-pale text-harvest flex items-center justify-center mx-auto">
                 <Sparkles className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold text-forest">Ready for Crop Diagnosis</h3>
-              <p className="text-sm text-charcoal-muted">
-                Select a sample photo or upload your crop leaf picture to analyze disease symptoms and receive verified Jharkhand agricultural advisories.
+              <h3 className="text-xl font-bold text-forest">Ready for Visual & OCR Analysis</h3>
+              <p className="text-sm text-charcoal-muted max-w-md mx-auto">
+                Take a photo or upload an image of a crop leaf, pest insect, or fertilizer/pesticide bag to get instant diagnostic reports and OCR text extraction.
               </p>
               <button
                 onClick={() => runAnalysis(selectedImage)}
@@ -273,44 +313,82 @@ export const CropScanner = ({ onVoiceClick }) => {
             </div>
           )}
 
-          {/* AI DIAGNOSIS RESULT CARD */}
+          {/* AI DIAGNOSIS & OCR RESULT CARD */}
           {analysisResult && (
             <div className="bg-paper-card rounded-3xl p-6 sm:p-8 border border-paper-dark shadow-soft-natural space-y-6 animate-fadeIn">
               
               {/* Header: Issue Name + Confidence + Severity */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-paper-muted">
                 <div>
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-harvest">
-                    {t('detectedIssueTitle')}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-harvest">
+                      {t('detectedIssueTitle')}
+                    </span>
+                    {analysisResult.category && (
+                      <span className="text-xxs font-black px-2 py-0.5 rounded-full bg-forest text-harvest uppercase">
+                        {analysisResult.category.replace('_', ' ')}
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-2xl font-black text-forest mt-0.5">
-                    {analysisResult.localNames[lang] || analysisResult.name}
+                    {analysisResult.localNames?.[lang] || analysisResult.name}
                   </h3>
+                  {analysisResult.crop && (
+                    <p className="text-xs font-bold text-charcoal-muted">
+                      Crop / Category: <span className="text-forest">{analysisResult.crop}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3">
                   {/* Confidence Badge */}
                   <div className="bg-leaf-pale px-3.5 py-1.5 rounded-2xl border border-leaf/30 text-center">
                     <p className="text-xs text-charcoal-muted font-bold">{t('confidenceLabel')}</p>
-                    <p className="text-lg font-black text-forest">{analysisResult.confidence}%</p>
+                    <p className="text-lg font-black text-forest">
+                      {Math.round(analysisResult.confidence > 1 ? analysisResult.confidence : analysisResult.confidence * 100)}%
+                    </p>
                   </div>
 
                   {/* Severity Badge */}
                   <div className="bg-harvest-pale px-3.5 py-1.5 rounded-2xl border border-harvest/30 text-center">
                     <p className="text-xs text-charcoal-muted font-bold">{t('severityLabel')}</p>
-                    <p className="text-sm font-black text-harvest">{t('severityVal')}</p>
+                    <p className="text-sm font-black text-harvest">
+                      {analysisResult.severity || t('severityVal')}
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Symptoms */}
+              {/* OCR Extracted Label Text Box (Displayed when text is detected on labels/bags) */}
+              {analysisResult.detectedText && (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-400/40 text-charcoal space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-amber-700" />
+                      OCR Extracted Packaging & Label Text
+                    </span>
+                    <button
+                      onClick={handleCopyOcrText}
+                      className="px-2 py-1 rounded-lg bg-paper border border-paper-dark text-xxs font-bold text-charcoal hover:text-forest flex items-center gap-1"
+                    >
+                      {copiedText ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-amber-700" />}
+                      <span>{copiedText ? "Copied" : "Copy Text"}</span>
+                    </button>
+                  </div>
+                  <p className="text-xs font-mono bg-paper p-3 rounded-xl border border-paper-dark whitespace-pre-wrap leading-relaxed select-all text-forest-dark font-medium">
+                    {analysisResult.detectedText}
+                  </p>
+                </div>
+              )}
+
+              {/* Symptoms / Diagnosis */}
               <div className="space-y-2">
                 <h4 className="text-sm font-extrabold text-forest uppercase tracking-wider flex items-center gap-2">
                   <Info className="w-4 h-4 text-leaf" />
                   <span>{t('symptomsHeading')}</span>
                 </h4>
                 <p className="text-sm text-charcoal leading-relaxed bg-paper p-4 rounded-2xl border border-paper-dark">
-                  {analysisResult.symptoms[lang] || analysisResult.symptoms.en}
+                  {analysisResult.symptoms?.[lang] || analysisResult.symptoms?.en || analysisResult.symptoms}
                 </p>
               </div>
 
@@ -322,7 +400,7 @@ export const CropScanner = ({ onVoiceClick }) => {
                 </h4>
 
                 <div className="space-y-2">
-                  {(analysisResult.actions[lang] || analysisResult.actions.en).map((step, idx) => (
+                  {(analysisResult.actions?.[lang] || analysisResult.actions?.en || []).map((step, idx) => (
                     <div key={idx} className="flex items-start gap-3 p-3.5 rounded-2xl bg-paper border border-paper-dark">
                       <span className="w-6 h-6 rounded-full bg-forest text-harvest-amber text-xs font-extrabold flex items-center justify-center shrink-0">
                         {idx + 1}
@@ -336,12 +414,14 @@ export const CropScanner = ({ onVoiceClick }) => {
               </div>
 
               {/* Weather Link Alert */}
-              <div className="p-4 rounded-2xl bg-harvest-pale/60 border border-harvest/40 text-forest text-xs font-semibold flex items-start gap-3">
-                <CloudRain className="w-5 h-5 text-harvest shrink-0 mt-0.5" />
-                <p>
-                  {analysisResult.weatherAlert[lang] || analysisResult.weatherAlert.en}
-                </p>
-              </div>
+              {analysisResult.weatherAlert && (
+                <div className="p-4 rounded-2xl bg-harvest-pale/60 border border-harvest/40 text-forest text-xs font-semibold flex items-start gap-3">
+                  <CloudRain className="w-5 h-5 text-harvest shrink-0 mt-0.5" />
+                  <p>
+                    {analysisResult.weatherAlert?.[lang] || analysisResult.weatherAlert?.en || analysisResult.weatherAlert}
+                  </p>
+                </div>
+              )}
 
               {/* AUDIO PLAYBACK BUTTONS (Hindi / Santhali) */}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2">

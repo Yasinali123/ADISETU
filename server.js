@@ -311,7 +311,7 @@ app.post('/api/sarvam-tts', async (req, res) => {
   }
 });
 
-// AI Crop Leaf Computer Vision Analysis Endpoint (Gemini 2.0 Flash / Groq / OpenAI / xAI)
+// AI Crop Leaf Computer Vision & OCR Analysis Endpoint (Gemini 3.5 Flash / 3.1 Flash Lite / Vision Models)
 app.post('/api/crop-analyze', async (req, res) => {
   const { imageSrc, apiKey, model: reqModel } = req.body;
 
@@ -321,51 +321,79 @@ app.post('/api/crop-analyze', async (req, res) => {
 
   const geminiKey = apiKey?.startsWith('AQ.') || apiKey?.startsWith('AIza') ? apiKey : (process.env.GEMINI_API_KEY || SYSTEM_GEMINI_KEY);
 
-  // 1. Primary: Google Gemini Multimodal Vision Engine (High-Accuracy Pest & Disease Pathology)
+  // 1. Primary: Google Gemini Multimodal Vision & OCR Engine
   if (geminiKey) {
     try {
-      const mimeType = imageSrc.startsWith('data:image/png') ? 'image/png' : 'image/jpeg';
-      const base64Data = imageSrc.includes('base64,') ? imageSrc.split('base64,')[1] : imageSrc;
+      let mimeType = 'image/jpeg';
+      let base64Data = '';
 
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
-      const geminiRes = await fetch(geminiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: 'You are an expert agricultural plant pathologist and entomologist analyzing a crop photo. Carefully inspect the leaf, stem, or fruit for pests, insects, larvae, caterpillars, borers, aphids, whiteflies, fungal spots, blight, yellowing, or disease symptoms. If pests or diseases are present, accurately identify them (e.g. Fall Armyworm, Paddy Stem Borer, Aphids, Early Blight, Sheath Blight, Powdery Mildew). Respond ONLY in valid JSON with keys: diseaseId (string), name (string), crop (string), localNames (object with hi, sat, en strings), confidence (number 0-100), severity (string: "High Risk" | "Moderate Risk" | "Low Risk"), severityLevel (number 1-3), symptoms (object with hi, sat, en strings describing the specific pests or damage found), actions (object with hi, sat, en arrays of 3 specific pesticide/treatment step strings), weatherAlert (object with hi, sat, en strings).'
-                },
-                {
-                  inline_data: {
-                    mime_type: mimeType,
-                    data: base64Data
-                  }
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 800,
-            responseMimeType: 'application/json'
+      if (imageSrc.startsWith('data:')) {
+        mimeType = imageSrc.split(';')[0].split(':')[1] || 'image/jpeg';
+        base64Data = imageSrc.split('base64,')[1] || '';
+      } else if (imageSrc.startsWith('http://') || imageSrc.startsWith('https://')) {
+        try {
+          const imgFetch = await fetch(imageSrc);
+          if (imgFetch.ok) {
+            const arrayBuffer = await imgFetch.arrayBuffer();
+            base64Data = Buffer.from(arrayBuffer).toString('base64');
+            mimeType = imgFetch.headers.get('content-type') || 'image/jpeg';
           }
-        })
-      });
-
-      if (geminiRes.ok) {
-        const data = await geminiRes.json();
-        const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const cleaned = textContent.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-        if (parsed && parsed.name) {
-          return res.json({ success: true, analysis: parsed, provider: 'gemini-2.0-flash' });
+        } catch (fetchErr) {
+          console.warn('[Crop Vision Server] Remote image fetch error:', fetchErr);
         }
-      } else {
-        const errBody = await geminiRes.json().catch(() => ({}));
-        console.warn('[Gemini Vision Server] HTTP', geminiRes.status, errBody);
+      }
+
+      if (!base64Data) {
+        return res.status(400).json({ success: false, error: 'Invalid image data or failed to load image' });
+      }
+
+      const visionOcrPrompt = 'You are an advanced Agricultural Computer Vision & OCR Diagnostic AI for farmers in Jharkhand, India. Analyze this image with high precision. Check for plant diseases, fungal blight, leaf spots, insect pests, caterpillars, stem borers, or deficiencies. Also perform full OCR text extraction if the image contains printed/handwritten text on pesticide bottles, fertilizer packaging, seed packets, or soil test reports. Respond ONLY with valid JSON with keys: diseaseId (string), name (string), crop (string), category (string: "crop_disease" | "pest_damage" | "fertilizer_ocr" | "pesticide_ocr" | "soil_health_ocr" | "healthy_crop"), localNames (object with hi, sat, en strings), confidence (number 80-99), severity (string: "High Risk" | "Moderate Risk" | "Low Risk" | "Optimal"), severityLevel (number 1-3), detectedText (string of OCR extracted label text if present, or null), symptoms (object with hi, sat, en strings), actions (object with hi, sat, en arrays of 3 action strings with dosages/steps), weatherAlert (object with hi, sat, en strings).';
+
+      const candidateModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+
+      for (const modelName of candidateModels) {
+        try {
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`;
+          const geminiRes = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    { text: visionOcrPrompt },
+                    {
+                      inline_data: {
+                        mime_type: mimeType,
+                        data: base64Data
+                      }
+                    }
+                  ]
+                }
+              ],
+              generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 1000,
+                responseMimeType: 'application/json'
+              }
+            })
+          });
+
+          if (geminiRes.ok) {
+            const data = await geminiRes.json();
+            const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const cleaned = textContent.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(cleaned);
+            if (parsed && parsed.name) {
+              return res.json({ success: true, analysis: parsed, provider: modelName });
+            }
+          } else {
+            const errBody = await geminiRes.json().catch(() => ({}));
+            console.warn(`[Gemini Vision Server] ${modelName} HTTP ${geminiRes.status}:`, errBody);
+          }
+        } catch (modelErr) {
+          console.warn(`[Gemini Vision Server] ${modelName} Exception:`, modelErr);
+        }
       }
     } catch (err) {
       console.warn('[Gemini Vision Exception]:', err);
