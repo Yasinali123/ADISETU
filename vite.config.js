@@ -256,6 +256,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const groqKey1 = env.GROQ_API_KEY_1 || env.VITE_GROQ_API_KEY_1 || env.GROQ_API_KEY || ('gsk_' + '7MNLaJ4WwA600fpx25X4WGdyb3FYVeJiebxuTWKv3KXHGG7fmCuw');
   const groqKey2 = env.GROQ_API_KEY_2 || env.VITE_GROQ_API_KEY_2 || '';
+  const groqModel = env.GROQ_MODEL || env.VITE_GROQ_MODEL || 'qwen/qwen3.8-27b';
+  const groqVisionModel = env.GROQ_VISION_MODEL || env.VITE_GROQ_VISION_MODEL || 'qwen/qwen3.8-27b';
   const sarvamKey = env.SARVAM_API_KEY || env.VITE_SARVAM_API_KEY || 'sk_q7qre2sd_skbmTZP7ExF7j4YxeumJT0KT';
   const hfKey = env.HUGGINGFACE_API_KEY || env.VITE_HUGGINGFACE_API_KEY || '';
   const geminiKey = env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY || SYSTEM_GEMINI_KEY;
@@ -266,6 +268,8 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_GROQ_API_KEY': JSON.stringify(groqKey1),
       'import.meta.env.VITE_GROQ_API_KEY_1': JSON.stringify(groqKey1),
       'import.meta.env.VITE_GROQ_API_KEY_2': JSON.stringify(groqKey2),
+      'import.meta.env.VITE_GROQ_MODEL': JSON.stringify(groqModel),
+      'import.meta.env.VITE_GROQ_VISION_MODEL': JSON.stringify(groqVisionModel),
       'import.meta.env.VITE_SARVAM_API_KEY': JSON.stringify(sarvamKey),
       'import.meta.env.VITE_HUGGINGFACE_API_KEY': JSON.stringify(hfKey),
       'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(geminiKey)

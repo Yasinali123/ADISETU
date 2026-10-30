@@ -58,6 +58,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final int CAMERA_PERMISSION_REQUEST = 1002;
     private static final int LOCATION_PERMISSION_REQUEST = 1003;
+    private static final int AUDIO_PERMISSION_REQUEST = 1004;
+    private static final int APP_PERMISSIONS_REQUEST = 1005;
 
     private WebView webView;
     private LinearLayout offlineView;
@@ -66,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
 
     private ValueCallback<Uri[]> fileUploadCallback;
     private String cameraPhotoPath;
+    private PermissionRequest pendingWebPermissionRequest;
 
     private ConnectivityManager.NetworkCallback networkCallback;
 
@@ -83,11 +86,29 @@ public class MainActivity extends AppCompatActivity {
         setupRetryButton();
         registerNetworkCallback();
         checkForUpdates();
+        checkAndRequestAppPermissions();
 
         if (isNetworkAvailable()) {
             loadWebsite();
         } else {
             showOfflineView();
+        }
+    }
+
+    private void checkAndRequestAppPermissions() {
+        List<String> neededPermissions = new ArrayList<>();
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            neededPermissions.add(Manifest.permission.RECORD_AUDIO);
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            neededPermissions.add(Manifest.permission.CAMERA);
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            neededPermissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+
+        if (!neededPermissions.isEmpty()) {
+            ActivityCompat.requestPermissions(this, neededPermissions.toArray(new String[0]), APP_PERMISSIONS_REQUEST);
         }
     }
 
@@ -101,6 +122,7 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowContentAccess(true);
         settings.setGeolocationEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setUserAgentString(settings.getUserAgentString() + " ADISETU-Android/1.0");
@@ -299,7 +321,20 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if (requestCode == CAMERA_PERMISSION_REQUEST) {
+        if (requestCode == AUDIO_PERMISSION_REQUEST || requestCode == APP_PERMISSIONS_REQUEST) {
+            boolean audioGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                    == PackageManager.PERMISSION_GRANTED;
+            if (pendingWebPermissionRequest != null) {
+                runOnUiThread(() -> {
+                    if (audioGranted) {
+                        pendingWebPermissionRequest.grant(pendingWebPermissionRequest.getResources());
+                    } else {
+                        pendingWebPermissionRequest.deny();
+                    }
+                    pendingWebPermissionRequest = null;
+                });
+            }
+        } else if (requestCode == CAMERA_PERMISSION_REQUEST) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // Camera permission granted, user can retry
             }
@@ -440,7 +475,33 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onPermissionRequest(final PermissionRequest request) {
-            runOnUiThread(() -> request.grant(request.getResources()));
+            runOnUiThread(() -> {
+                String[] resources = request.getResources();
+                List<String> neededOsPerms = new ArrayList<>();
+
+                for (String resource : resources) {
+                    if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
+                        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO)
+                                != PackageManager.PERMISSION_GRANTED) {
+                            neededOsPerms.add(Manifest.permission.RECORD_AUDIO);
+                        }
+                    } else if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
+                        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
+                                != PackageManager.PERMISSION_GRANTED) {
+                            neededOsPerms.add(Manifest.permission.CAMERA);
+                        }
+                    }
+                }
+
+                if (!neededOsPerms.isEmpty()) {
+                    pendingWebPermissionRequest = request;
+                    ActivityCompat.requestPermissions(MainActivity.this,
+                        neededOsPerms.toArray(new String[0]),
+                        AUDIO_PERMISSION_REQUEST);
+                } else {
+                    request.grant(resources);
+                }
+            });
         }
     }
 }
